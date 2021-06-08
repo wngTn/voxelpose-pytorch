@@ -9,6 +9,8 @@ from __future__ import print_function
 
 import os.path as osp
 import numpy as np
+import scipy as sp
+from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
 
@@ -20,6 +22,7 @@ import random
 import cv2
 
 import os
+from collections import OrderedDict
 
 from utils.transforms import get_affine_transform
 from utils.transforms import affine_transform
@@ -41,14 +44,14 @@ LIMBS = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9],
         [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
 
 
-class ShelfSynthetic(Dataset):
+class HolisticORSynthetic(Dataset):
     def __init__(self, cfg, image_set, is_train, transform=None):
         super().__init__()
         self.pixel_std = 200.0
         self.joints_def = coco_joints_def
         self.limbs = LIMBS
         self.num_joints = len(coco_joints_def)
-        self.cam_list = [0, 1, 2, 3, 4]
+        self.cam_list = [0, 1, 2]
         self.num_views = len(self.cam_list)
         self.maximum_person = cfg.MULTI_PERSON.MAX_PEOPLE_NUM
 
@@ -81,22 +84,47 @@ class ShelfSynthetic(Dataset):
         pose_db_file = os.path.join(self.dataset_root, "..", "panoptic_training_pose.pkl")
         self.pose_db = pickle.load(open(pose_db_file, "rb"))
         self.cameras = self._get_cam()
+        import ipdb; ipdb.set_trace()
 
     def _get_cam(self):
-        cam_file = osp.join(self.dataset_root, "calibration_shelf.json")
-        with open(cam_file) as cfile:
-            cameras = json.load(cfile)
+        # bring our calibration files into format of voxelpose
+        cameras = OrderedDict()
+        for idx, cam_id in enumerate(os.listdir(self.dataset_root)):
+            ds = {"k": np.array([0]), "p": np.array([0, 0])}
+
+            intrinsics = osp.join(self.dataset_root, cam_id, 'camera_calibration.yml')
+            assert osp.exists(intrinsics)
+            fs = cv2.FileStorage(intrinsics, cv2.FILE_STORAGE_READ)
+            color_intrinsics = fs.getNode("color_camera_matrix").mat()
+            ds['fx'] = color_intrinsics[0, 0]
+            ds['fy'] = color_intrinsics[1, 1]
+            ds['cx'] = color_intrinsics[0, 2]
+            ds['cy'] = color_intrinsics[1, 2]
+            # color distortion coefs. TODO: need to use kinect model. maybe pre undistort?
+            # or just use cv::project_points? see example
+            dist = fs.getNode("color_distortion_coefficients").mat()
+            ds['k'] = np.array(dist[[0, 1, 4, 5, 6, 7]])
+            ds['p'] = np.array(dist[2:4])
+
+            extrinsics = osp.join(self.dataset_root, cam_id, "world2camera.json")
+            with open(extrinsics, 'r') as f:
+                ext = json.load(f)["value0"]
+                ds["T"] = np.array([x for x in ext['translation'].values()])
+                _R = ext['rotation']
+                rot = Rotation.from_quat([_R['x'], _R['y'], _R['z'], _R['w']])
+                ds["R"] = rot.as_matrix()
+            # put into voxelpose format
+            cameras[str(idx)] = ds
 
         for id, cam in cameras.items():
             for k, v in cam.items():
                 cameras[id][k] = np.array(v)
-        import ipdb; ipdb.set_trace()
 
         return cameras
 
     def __getitem__(self, idx):
         # nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.1, 0.2, 0.4, 0.2])
-        nposes = np.random.choice(range(1, 6))
+        nposes = np.random.choice(range(1, 10))
         bbox_list = []
         center_list = []
 
@@ -113,7 +141,7 @@ class ShelfSynthetic(Dataset):
             new_xy = rotate_points(points, center, rot_rad) - center + new_center
 
             loop_count = 0
-            while not self.isvalid(self.calc_bbox(new_xy, joints_3d_vis[n]), bbox_list):
+            while not self.isvalid(new_center, self.calc_bbox(new_xy, joints_3d_vis[n]), bbox_list):
                 loop_count += 1
                 if loop_count >= 100:
                     break
@@ -149,8 +177,8 @@ class ShelfSynthetic(Dataset):
         joints_3d_vis = copy.deepcopy(joints_3d_vis)
         nposes = len(joints_3d)
 
-        width = 1032
-        height = 776
+        width = 360
+        height = 288
         c = np.array([width / 2.0, height / 2.0], dtype=np.float32)
         # s = np.array(
         #     [width / self.pixel_std, height / self.pixel_std], dtype=np.float32)
@@ -264,9 +292,9 @@ class ShelfSynthetic(Dataset):
             feat_stride = self.image_size / self.heatmap_size
 
             for n in range(nposes):
-                obscured = random.random() < 0.05
-                if obscured:
-                    continue
+                # obscured = random.random() < 0.05
+                # if obscured:
+                #     continue
                 human_scale = 2 * self.compute_human_scale(joints[n] / feat_stride, joints_vis[n])
                 if human_scale == 0:
                     continue
@@ -289,11 +317,10 @@ class ShelfSynthetic(Dataset):
                     x = np.arange(0, size, 1, np.float32)
                     y = x[:, np.newaxis]
                     x0 = y0 = size // 2
-                    # scale = 1 - np.abs(np.random.randn(1) * 0.25)
                     scale = 0.9 + np.random.randn(1) * 0.03 if random.random() < 0.6 else 1.0
-                    if joint_id in [7, 8, 13, 14]:
+                    if joint_id in [7, 8]:
                         scale = scale * 0.5 if random.random() < 0.1 else scale
-                    elif joint_id in [9, 10, 15, 16]:
+                    elif joint_id in [9, 10]:
                         scale = scale * 0.2 if random.random() < 0.1 else scale
                     else:
                         scale = scale * 0.5 if random.random() < 0.05 else scale
@@ -362,17 +389,25 @@ class ShelfSynthetic(Dataset):
     @staticmethod
     def get_new_center(center_list):
         if len(center_list) == 0 or random.random() < 0.7:
-            new_center = np.array([np.random.uniform(-1000.0, 2000.0), np.random.uniform(-1600.0, 1600.0)])
+            new_center = np.array([np.random.uniform(-2500.0, 8500.0), np.random.uniform(-1000.0, 10000.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             new_center = xy + np.random.normal(500, 50, 2) * np.random.choice([1, -1], 2)
 
         return new_center
 
-    @staticmethod
-    def isvalid(bbox, bbox_list):
+    def isvalid(self, new_center, bbox, bbox_list):
+        new_center_us = new_center.reshape(1, -1)
+        vis = 0
+        for k, cam in self.cameras.items():
+            width = 360
+            height = 288
+            loc_2d = project_pose(np.hstack((new_center_us, [[1000.0]])), cam)
+            if 10 < loc_2d[0, 0] < width - 10 and 10 < loc_2d[0, 1] < height - 10:
+                vis += 1
+
         if len(bbox_list) == 0:
-            return True
+            return vis >= 2
 
         bbox_list = np.array(bbox_list)
         x0 = np.maximum(bbox[0], bbox_list[:, 0])
@@ -385,7 +420,7 @@ class ShelfSynthetic(Dataset):
         area_list = (bbox_list[:, 2] - bbox_list[:, 0]) * (bbox_list[:, 3] - bbox_list[:, 1])
         iou_list = intersection / (area + area_list - intersection)
 
-        return np.max(iou_list) < 0.01
+        return vis >= 2 and np.max(iou_list) < 0.01
 
     @staticmethod
     def calc_bbox(pose, pose_vis):

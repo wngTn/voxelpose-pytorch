@@ -5,7 +5,6 @@ from __future__ import print_function
 import time
 import logging
 import os
-import copy
 
 import torch
 import numpy as np

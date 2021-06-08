@@ -43,6 +43,7 @@ class ProjectLayer(nn.Module):
         return grid
 
     def get_voxel(self, heatmaps, meta, grid_size, grid_center, cube_size):
+        import ipdb; ipdb.set_trace()
         device = heatmaps[0].device
         batch_size = heatmaps[0].shape[0]
         num_joints = heatmaps[0].shape[1]

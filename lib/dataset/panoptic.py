@@ -286,6 +286,8 @@ class Panoptic(JointsDataset):
             ap, rec = self._eval_list_to_ap(eval_list, total_gt, t)
             aps.append(ap)
             recs.append(rec)
+        if total_gt == 0:
+            import ipdb; ipdb.set_trace()
 
         return aps, recs, self._eval_list_to_mpjpe(eval_list), self._eval_list_to_recall(eval_list, total_gt)
 
@@ -335,7 +337,4 @@ class Panoptic(JointsDataset):
         gt_ids = [e["gt_id"] for e in eval_list if e["mpjpe"] < threshold]
 
         return len(np.unique(gt_ids)) / total_gt
-
-
-
 

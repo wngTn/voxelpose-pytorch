@@ -63,6 +63,7 @@ def main():
         num_workers=config.WORKERS,
         pin_memory=True)
 
+
     cudnn.benchmark = config.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
@@ -84,6 +85,7 @@ def main():
     preds = []
     with torch.no_grad():
         for i, (inputs, targets_2d, weights_2d, targets_3d, meta, input_heatmap) in enumerate(tqdm(test_loader)):
+            import ipdb; ipdb.set_trace()
             if 'panoptic' in config.DATASET.TEST_DATASET:
                 pred, _, _, _, _, _ = model(views=inputs, meta=meta)
             elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
