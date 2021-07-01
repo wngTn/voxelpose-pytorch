@@ -41,19 +41,18 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
                                                                               targets_2d=targets_2d,
                                                                               weights_2d=weights_2d,
                                                                               targets_3d=targets_3d[0])
-        elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET:
+        elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET or 'holistic_or':
             pred, heatmaps, grid_centers, loss_2d, loss_3d, loss_cord = model(meta=meta, targets_3d=targets_3d[0],
                                                                               input_heatmaps=input_heatmap)
-
         loss_2d = loss_2d.mean()
         loss_3d = loss_3d.mean()
         loss_cord = loss_cord.mean()
 
-        losses_2d.update(loss_2d.item())
-        losses_3d.update(loss_3d.item())
-        losses_cord.update(loss_cord.item())
-        loss = loss_2d + loss_3d + loss_cord
-        losses.update(loss.item())
+        losses_2d.update(float(loss_2d))
+        losses_3d.update(float(loss_3d))
+        losses_cord.update(float(loss_cord))
+        loss = float(loss_2d + loss_3d + loss_cord)
+        losses.update(loss)
 
         if loss_cord > 0:
             optimizer.zero_grad()

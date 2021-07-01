@@ -21,6 +21,7 @@ class ProjectLayer(nn.Module):
         self.grid_size = cfg.MULTI_PERSON.SPACE_SIZE
         self.cube_size = cfg.MULTI_PERSON.INITIAL_CUBE_SIZE
         self.grid_center = cfg.MULTI_PERSON.SPACE_CENTER
+        self.holistic_or = cfg.DATASET.TRAIN_DATASET == "holistic_or_synthetic"
 
     def compute_grid(self, boxSize, boxCenter, nBins, device=None):
         if isinstance(boxSize, int) or isinstance(boxSize, float):
@@ -43,7 +44,6 @@ class ProjectLayer(nn.Module):
         return grid
 
     def get_voxel(self, heatmaps, meta, grid_size, grid_center, cube_size):
-        import ipdb; ipdb.set_trace()
         device = heatmaps[0].device
         batch_size = heatmaps[0].shape[0]
         num_joints = heatmaps[0].shape[1]
@@ -76,7 +76,7 @@ class ProjectLayer(nn.Module):
                     cam = {}
                     for k, v in meta[c]['camera'].items():
                         cam[k] = v[i]
-                    xy = cameras.project_pose(grid, cam)
+                    xy = cameras.project_pose(grid, cam, holistic=self.holistic_or)
 
                     bounding[i, 0, 0, :, c] = (xy[:, 0] >= 0) & (xy[:, 1] >= 0) & (xy[:, 0] < width) & (
                                 xy[:, 1] < height)

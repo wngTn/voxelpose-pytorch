@@ -81,23 +81,24 @@ def main():
         train_dataset,
         batch_size=config.TRAIN.BATCH_SIZE * len(gpus),
         shuffle=config.TRAIN.SHUFFLE,
-        num_workers=config.WORKERS,
+        num_workers=0, #config.WORKERS,
         pin_memory=True)
 
-    test_dataset = eval('dataset.' + config.DATASET.TEST_DATASET)(
-        config, config.DATASET.TEST_SUBSET, False,
-        transforms.Compose([
-            transforms.ToTensor(),
-            normalize,
-        ]))
+    # test_dataset = eval('dataset.' + config.DATASET.TEST_DATASET)(
+    #     config, config.DATASET.TEST_SUBSET, False,
+    #     transforms.Compose([
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ]))
 
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset,
-        batch_size=config.TEST.BATCH_SIZE * len(gpus),
-        shuffle=False,
-        num_workers=config.WORKERS,
-        pin_memory=True)
+    # test_loader = torch.utils.data.DataLoader(
+    #     test_dataset,
+    #     batch_size=config.TEST.BATCH_SIZE * len(gpus),
+    #     shuffle=False,
+    #     num_workers=config.WORKERS,
+    #     pin_memory=True)
 
+    torch.autograd.set_detect_anomaly(True)
     cudnn.benchmark = config.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
@@ -106,7 +107,7 @@ def main():
     model = eval('models.' + config.MODEL + '.get_multi_person_pose_net')(
         config, is_train=True)
     with torch.no_grad():
-        model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
+       model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
     model, optimizer = get_optimizer(model)
 
@@ -131,7 +132,8 @@ def main():
 
         # lr_scheduler.step()
         train_3d(config, model, optimizer, train_loader, epoch, final_output_dir, writer_dict)
-        precision = validate_3d(config, model, test_loader, final_output_dir)
+        # precision = validate_3d(config, model, test_loader, final_output_dir)
+        precision = 0.1
 
         if precision > best_precision:
             best_precision = precision

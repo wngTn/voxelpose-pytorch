@@ -22,8 +22,19 @@ def unfold_camera_param(camera, device=None):
     p = torch.as_tensor(camera['p'], dtype=torch.float, device=device)
     return R, T, f, c, k, p
 
+def project_point_radial(x, R, T, K):
+    n = x.shape[0]
+    x = x
+    # world2camera
+    # https://www-users.cs.umn.edu/~hspark/CSci5980/Lec2_ProjectionMatrix.pdf
+    xcam = torch.mm(R, torch.t(x)) - T
+    xcam = torch.mm(K, xcam)
 
-def project_point_radial(x, R, T, f, c, k, p):
+    ypixel = xcam[:2] / (xcam[2]+1e-5)
+    return torch.t(ypixel)
+
+
+def _project_point_radial(x, R, T, f, c, k, p):
     """
     Args
         x: Nx3 points in world coordinates
@@ -53,9 +64,19 @@ def project_point_radial(x, R, T, f, c, k, p):
     return torch.t(ypixel)
 
 
-def project_pose(x, camera):
+def project_pose(x, camera, holistic=False):
     R, T, f, c, k, p = unfold_camera_param(camera, device=x.device)
-    return project_point_radial(x, R, T, f, c, k, p)
+    # Voxelpose uses world2camera with subtraction
+    # as opposed to addition
+    if holistic:
+        K = torch.tensor([f[0][0], 0, c[0][0],
+                         0, f[1][0], c[1][0],
+                         0, 0, 1],
+                         dtype=torch.float, device=x.device)
+        K = K.reshape(3, 3)
+        return project_point_radial(x, R, T, K)
+    else:
+        return _project_point_radial(x, R, T, f, c, k, p)
 
 
 def world_to_camera_frame(x, R, T):

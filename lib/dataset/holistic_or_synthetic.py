@@ -28,6 +28,8 @@ from utils.transforms import get_affine_transform
 from utils.transforms import affine_transform
 from utils.transforms import rotate_points, get_scale
 from utils.cameras_cpu import project_pose
+from utils.cameras_cpu import rot_trans_to_homogenous, homogenous_to_rot_trans
+from utils.cameras_cpu import rotation_to_homogenous
 
 logger = logging.getLogger(__name__)
 
@@ -83,37 +85,13 @@ class HolisticORSynthetic(Dataset):
 
         pose_db_file = os.path.join(self.dataset_root, "..", "panoptic_training_pose.pkl")
         self.pose_db = pickle.load(open(pose_db_file, "rb"))
-        self.cameras = self._get_cam()
-        import ipdb; ipdb.set_trace()
+        self.cameras = self._get_cams()
 
-    def _get_cam(self):
+    def _get_cams(self):
         # bring our calibration files into format of voxelpose
         cameras = OrderedDict()
         for idx, cam_id in enumerate(os.listdir(self.dataset_root)):
-            ds = {"k": np.array([0]), "p": np.array([0, 0])}
-
-            intrinsics = osp.join(self.dataset_root, cam_id, 'camera_calibration.yml')
-            assert osp.exists(intrinsics)
-            fs = cv2.FileStorage(intrinsics, cv2.FILE_STORAGE_READ)
-            color_intrinsics = fs.getNode("color_camera_matrix").mat()
-            ds['fx'] = color_intrinsics[0, 0]
-            ds['fy'] = color_intrinsics[1, 1]
-            ds['cx'] = color_intrinsics[0, 2]
-            ds['cy'] = color_intrinsics[1, 2]
-            # color distortion coefs. TODO: need to use kinect model. maybe pre undistort?
-            # or just use cv::project_points? see example
-            dist = fs.getNode("color_distortion_coefficients").mat()
-            ds['k'] = np.array(dist[[0, 1, 4, 5, 6, 7]])
-            ds['p'] = np.array(dist[2:4])
-
-            extrinsics = osp.join(self.dataset_root, cam_id, "world2camera.json")
-            with open(extrinsics, 'r') as f:
-                ext = json.load(f)["value0"]
-                ds["T"] = np.array([x for x in ext['translation'].values()])
-                _R = ext['rotation']
-                rot = Rotation.from_quat([_R['x'], _R['y'], _R['z'], _R['w']])
-                ds["R"] = rot.as_matrix()
-            # put into voxelpose format
+            ds = self._get_single_cam(cam_id)
             cameras[str(idx)] = ds
 
         for id, cam in cameras.items():
@@ -122,9 +100,69 @@ class HolisticORSynthetic(Dataset):
 
         return cameras
 
+    def _get_single_cam(self, cam):
+        ds = OrderedDict()
+        scaling = 1000
+        intrinsics = osp.join(self.dataset_root, cam, 'camera_calibration.yml')
+        assert osp.exists(intrinsics)
+        fs = cv2.FileStorage(intrinsics, cv2.FILE_STORAGE_READ)
+        color_intrinsics = fs.getNode("undistorted_color_camera_matrix").mat()
+        ds['fx'] = color_intrinsics[0, 0]
+        ds['fy'] = color_intrinsics[1, 1]
+        ds['cx'] = color_intrinsics[0, 2]
+        ds['cy'] = color_intrinsics[1, 2]
+        # images are undistorted! Just put 0. Voxelpose assumes just 4 dist coeffs
+        dist = fs.getNode("color_distortion_coefficients").mat()
+        # ds['k'] = np.array(dist[[0, 1, 4, 5, 6, 7]])
+        # ds['p'] = np.array(dist[2:4])
+        # we learn on undistorted images
+        ds['k'] = np.zeros((3, 1))
+        ds['p'] = np.zeros((2, 1))
+
+        depth2color_r = fs.getNode('depth2color_rotation').mat()
+        # depth2color_t is in mm by default, change all to meters
+        depth2color_t = fs.getNode('depth2color_translation').mat()
+
+        depth2color = rot_trans_to_homogenous(depth2color_r, depth2color_t.reshape(3))
+        ds["depth2color"] = depth2color
+
+        extrinsics = osp.join(self.dataset_root, cam, "world2camera.json")
+        with open(extrinsics, 'r') as f:
+            ext = json.load(f)
+            ext = ext if 'value0' not in ext else ext['value0']
+            trans = np.array([x for x in ext['translation'].values()])
+            # NOTE: world2camera translation convention is in meters. Here we convert
+            # to mm. Seems like Voxelpose was using mm as well.
+            trans = trans * 1000
+            _R = ext['rotation']
+            rot = Rotation.from_quat([_R['x'], _R['y'], _R['z'], _R['w']]).as_matrix()
+            ext_homo = rot_trans_to_homogenous(rot, trans)
+            # flip coordinate transform back to opencv convention
+
+        yz_flip = rotation_to_homogenous(np.pi * np.array([1, 0, 0]))
+        YZ_SWAP = rotation_to_homogenous(np.pi/2 * np.array([1, 0, 0]))
+
+        # ds["id"] = cam
+        # first swap into OPENGL convention, then we can apply intrinsics.
+        # then swap into our own Z-up prefered format..
+        depth2world = YZ_SWAP @ ext_homo @ yz_flip
+        # print(f"{cam} extrinsics:", depth2world)
+
+        # depth_R, depth_T = homogenous_to_rot_trans(depth2world)
+        # ds["depth2world"] = depth2world
+        color2world = depth2world @ np.linalg.inv(depth2color)
+        # ds["color2world"] = color2world
+        # voxelpose uses weird convention of subtracting translation
+        # for world2camera transformation. We return world2camera
+        # but with T according to their convention
+        R, T = homogenous_to_rot_trans(np.linalg.inv(color2world))
+        ds["R"] = R.T
+        ds["T"] = (-1) * -T
+        return ds
+
     def __getitem__(self, idx):
-        # nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.1, 0.2, 0.4, 0.2])
-        nposes = np.random.choice(range(1, 10))
+        nposes = np.random.choice([1, 2, 3, 4, 5, 6], p=[0.1, 0.1, 0.2, 0.3, 0.2, 0.1])
+        # nposes = np.random.choice(range(1, 10))
         bbox_list = []
         center_list = []
 
@@ -133,6 +171,8 @@ class HolisticORSynthetic(Dataset):
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
         for n in range(0, nposes):
+            if (n >= len(joints_3d)):
+                import ipdb; ipdb.set_trace()
             points = joints_3d[n][:, :2].copy()
             center = (points[11, :2] + points[12, :2]) / 2
             rot_rad = np.random.uniform(-180, 180)
@@ -149,9 +189,12 @@ class HolisticORSynthetic(Dataset):
                 new_xy = rotate_points(points, center, rot_rad) - center + new_center
 
             if loop_count >= 100:
+                if n == 0:
+                    print("Error: not able to find valid center")
                 nposes = n
                 joints_3d = joints_3d[:n]
                 joints_3d_vis = joints_3d_vis[:n]
+                break
             else:
                 center_list.append(new_center)
                 bbox_list.append(self.calc_bbox(new_xy, joints_3d_vis[n]))
@@ -177,8 +220,9 @@ class HolisticORSynthetic(Dataset):
         joints_3d_vis = copy.deepcopy(joints_3d_vis)
         nposes = len(joints_3d)
 
-        width = 360
-        height = 288
+        # TODO: need to move these to configs as well
+        width = self.image_size[0]
+        height = self.image_size[1]
         c = np.array([width / 2.0, height / 2.0], dtype=np.float32)
         # s = np.array(
         #     [width / self.pixel_std, height / self.pixel_std], dtype=np.float32)
@@ -190,10 +234,10 @@ class HolisticORSynthetic(Dataset):
         for n in range(nposes):
             pose2d = project_pose(joints_3d[n], cam)
 
-            x_check = np.bitwise_and(pose2d[:, 0] >= 0,
-                                     pose2d[:, 0] <= width - 1)
-            y_check = np.bitwise_and(pose2d[:, 1] >= 0,
-                                     pose2d[:, 1] <= height - 1)
+            x_check = np.bitwise_and(pose2d[:, 0] >= 200,
+                                     pose2d[:, 0] <= width - 200)
+            y_check = np.bitwise_and(pose2d[:, 1] >= 200,
+                                     pose2d[:, 1] <= height - 200)
             check = np.bitwise_and(x_check, y_check)
             vis = joints_3d_vis[n][:, 0] > 0
             vis[np.logical_not(check)] = 0
@@ -210,6 +254,8 @@ class HolisticORSynthetic(Dataset):
 
         if self.transform:
             input = self.transform(input)
+
+        assert len(joints) == nposes
 
         for n in range(nposes):
             for i in range(len(joints[0])):
@@ -242,6 +288,7 @@ class HolisticORSynthetic(Dataset):
 
         target_3d = self.generate_3d_target(joints_3d)
         target_3d = torch.from_numpy(target_3d)
+        # print("Num persons: ", nposes)
 
         meta = {
             'image': '',
@@ -388,24 +435,38 @@ class HolisticORSynthetic(Dataset):
 
     @staticmethod
     def get_new_center(center_list):
+        # TODO: these should also be in config
+        # width of room approximately 4.5m in both x and z direction
+        xmin = -1500
+        xmax = 1500
         if len(center_list) == 0 or random.random() < 0.7:
-            new_center = np.array([np.random.uniform(-2500.0, 8500.0), np.random.uniform(-1000.0, 10000.0)])
+            new_center = np.array([np.random.uniform(xmin, xmax), np.random.uniform(xmin, xmax)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
+            # TODO: do these offsets affect us?
             new_center = xy + np.random.normal(500, 50, 2) * np.random.choice([1, -1], 2)
 
         return new_center
 
     def isvalid(self, new_center, bbox, bbox_list):
+        # TODO: Put this in config?
+        # in our coordinate system Y+ is down, so our offset is in the negative Y direction
+        origin_z_offset = np.random.uniform(200, 500)
         new_center_us = new_center.reshape(1, -1)
         vis = 0
         for k, cam in self.cameras.items():
-            width = 360
-            height = 288
-            loc_2d = project_pose(np.hstack((new_center_us, [[1000.0]])), cam)
-            if 10 < loc_2d[0, 0] < width - 10 and 10 < loc_2d[0, 1] < height - 10:
+            # TODO: why so conservative with pixel coordinates?
+            width = self.image_size[0]
+            height = self.image_size[1]
+            center_3d = np.hstack((new_center_us, [[origin_z_offset]]))
+            loc_2d = project_pose(center_3d, cam)
+            # print(center_3d, "->", loc_2d)
+            # TODO: make this offset configurable. Why does Voxelpose use width x height here?
+            if 200 < loc_2d[0, 0] < width - 200 and 200 < loc_2d[0, 1] < height - 200:
+                # print(f"Cam {cam['id']} visible")
                 vis += 1
 
+        # print("Views visible: ", vis)
         if len(bbox_list) == 0:
             return vis >= 2
 

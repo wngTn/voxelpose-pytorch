@@ -5,20 +5,20 @@ CUDNN:
 BACKBONE_MODEL: ''
 MODEL: 'multi_person_posenet'
 DATA_DIR: ''
-GPUS: '0'
+GPUS: '0,1'
 OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
-WORKERS: 4
+WORKERS: 8
 PRINT_FREQ: 100
 
 DATASET:
   COLOR_RGB: True
   TRAIN_DATASET: 'holistic_or_synthetic'
-  # TEST_DATASET: 'campus'
+    # TEST_DATASET: 'campus'
   DATA_FORMAT: jpeg
   DATA_AUGMENTATION: False
   FLIP: False
-  ROOT: 'data/holistic_or'
+  ROOT: './data/holistic_or'
   ROT_FACTOR: 45
   SCALE_FACTOR: 0.35
   TEST_SUBSET: 'validation'
@@ -29,7 +29,7 @@ DATASET:
   CAMERA_NUM: 6
 NETWORK:
   PRETRAINED_BACKBONE: ''
-  PRETRAINED:  ''  # 'models/pytorch/imagenet/resnet50-19c8e357.pth'
+  PRETRAINED:  'models/pytorch/imagenet/resnet50-19c8e357.pth'
   TARGET_TYPE: gaussian
   IMAGE_SIZE:
   - 2048
@@ -59,18 +59,18 @@ DEBUG:
   SAVE_HEATMAPS_PRED: true
 MULTI_PERSON:
   SPACE_SIZE:
-    - 12000.0
-    - 12000.0
+    - 5000.0
+    - 5000.0
     - 2000.0
   SPACE_CENTER:
-    - 3000.0
-    - 4500.0
+    - 0.0
+    - 0.0
     - 1000.0
   INITIAL_CUBE_SIZE:
     - 80
     - 80
     - 20
-  MAX_PEOPLE_NUM: 10
+  MAX_PEOPLE_NUM: 6
   THRESHOLD: 0.1
 PICT_STRUCT:
   GRID_SIZE:

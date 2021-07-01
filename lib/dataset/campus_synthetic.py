@@ -213,6 +213,7 @@ class CampusSynthetic(Dataset):
 
         target_3d = self.generate_3d_target(joints_3d)
         target_3d = torch.from_numpy(target_3d)
+        # print("Num persons: ", nposes)
 
         meta = {
             'image': '',
@@ -228,6 +229,7 @@ class CampusSynthetic(Dataset):
             'camera': cam
         }
 
+        import ipdb; ipdb.set_trace()
         return input, target_heatmap, target_weight, target_3d, meta, input_heatmap
 
     @staticmethod
