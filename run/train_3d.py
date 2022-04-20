@@ -135,11 +135,12 @@ def main():
         # precision = validate_3d(config, model, test_loader, final_output_dir)
         precision = 0.1
 
-        if precision > best_precision:
-            best_precision = precision
-            best_model = True
-        else:
-            best_model = False
+        # if precision > best_precision:
+        #     best_precision = precision
+        #     best_model = True
+        # else:
+        #     best_model = False
+        best_model = True
 
         logger.info('=> saving checkpoint to {} (Best: {})'.format(final_output_dir, best_model))
         save_checkpoint({

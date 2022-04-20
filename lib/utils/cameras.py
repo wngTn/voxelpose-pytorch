@@ -27,7 +27,7 @@ def project_point_radial(x, R, T, K):
     x = x
     # world2camera
     # https://www-users.cs.umn.edu/~hspark/CSci5980/Lec2_ProjectionMatrix.pdf
-    xcam = torch.mm(R, torch.t(x)) - T
+    xcam = torch.mm(R, torch.t(x)) + T
     xcam = torch.mm(K, xcam)
 
     ypixel = xcam[:2] / (xcam[2]+1e-5)

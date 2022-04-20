@@ -32,7 +32,7 @@ def project_point_radial(x, R, T, f, c, k, p):
     # world2camera
     # https://www-users.cs.umn.edu/~hspark/CSci5980/Lec2_ProjectionMatrix.pdf
     # weird voxelpose convention.. we return -T because of this
-    xcam = R.dot(x.T) - T
+    xcam = R.dot(x.T) + T
     xcam = K @ xcam
 
     ypixel = xcam[:2] / (xcam[2]+1e-5)
@@ -60,6 +60,12 @@ def _project_point_radial(x, R, T, f, c, k, p):
     Returns
         ypixel.T: Nx2 points in pixel space
     """
+
+    #R R R T  X
+    #R R R T  Y
+    #R R R T  Z
+    #0 0 0 1  1
+    # World -> Camera
     n = x.shape[0]
     xcam = R.dot(x.T - T)
     y = xcam[:2] / (xcam[2]+1e-5)

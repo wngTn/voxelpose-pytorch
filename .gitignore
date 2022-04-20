@@ -128,10 +128,13 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-*/data/holistic_or/cn*
-*/data/CampusSeq1/Camera*
-*/data/CampusSeq1/Calibration
-*/data/Shelf/Camera*
+**/data/holistic_or/cn*
+**/data/CampusSeq1/Camera*
+**/data/CampusSeq1/Calibration
+**/data/Shelf/Camera*
 */data/panoptic-toolbox/data/*
-*/output/*
+**/output/*
+**/output_vis/*
+**/output_easymocap/*
 */log/*
+**/.vscode/*

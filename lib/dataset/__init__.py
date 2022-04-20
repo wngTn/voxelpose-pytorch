@@ -13,3 +13,4 @@ from dataset.campus_synthetic import CampusSynthetic as campus_synthetic
 from dataset.shelf import Shelf as shelf
 from dataset.campus import Campus as campus
 from dataset.holistic_or_synthetic import HolisticORSynthetic as holistic_or_synthetic 
+from dataset.holistic_or import HolisticOR as holistic_or

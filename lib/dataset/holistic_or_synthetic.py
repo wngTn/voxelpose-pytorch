@@ -42,8 +42,9 @@ coco_joints_def = {0: 'nose',
                    13: 'Lkne', 14: 'Rkne',
                    15: 'Lank', 16: 'Rank'}
 
-LIMBS = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [11, 13], [13, 15],
-        [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
+LIMBS = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [11, 13],
+         [13, 15],
+         [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
 
 
 class HolisticORSynthetic(Dataset):
@@ -53,7 +54,7 @@ class HolisticORSynthetic(Dataset):
         self.joints_def = coco_joints_def
         self.limbs = LIMBS
         self.num_joints = len(coco_joints_def)
-        self.cam_list = [0, 1, 2]
+        self.cam_list = [0, 1, 2, 3, 4, 5]
         self.num_views = len(self.cam_list)
         self.maximum_person = cfg.MULTI_PERSON.MAX_PEOPLE_NUM
 
@@ -90,9 +91,10 @@ class HolisticORSynthetic(Dataset):
     def _get_cams(self):
         # bring our calibration files into format of voxelpose
         cameras = OrderedDict()
-        for idx, cam_id in enumerate(os.listdir(self.dataset_root)):
+        cams = sorted(next(os.walk(self.dataset_root))[1])
+        for idx, cam_id in enumerate(cams):
             ds = self._get_single_cam(cam_id)
-            cameras[str(idx)] = ds
+            cameras[str(int(cam_id[-1]) - 1)] = ds
 
         for id, cam in cameras.items():
             for k, v in cam.items():
@@ -104,6 +106,7 @@ class HolisticORSynthetic(Dataset):
         ds = OrderedDict()
         scaling = 1000
         intrinsics = osp.join(self.dataset_root, cam, 'camera_calibration.yml')
+        print(intrinsics)
         assert osp.exists(intrinsics)
         fs = cv2.FileStorage(intrinsics, cv2.FILE_STORAGE_READ)
         color_intrinsics = fs.getNode("undistorted_color_camera_matrix").mat()
@@ -140,7 +143,7 @@ class HolisticORSynthetic(Dataset):
             # flip coordinate transform back to opencv convention
 
         yz_flip = rotation_to_homogenous(np.pi * np.array([1, 0, 0]))
-        YZ_SWAP = rotation_to_homogenous(np.pi/2 * np.array([1, 0, 0]))
+        YZ_SWAP = rotation_to_homogenous(np.pi / 2 * np.array([1, 0, 0]))
 
         # ds["id"] = cam
         # first swap into OPENGL convention, then we can apply intrinsics.
@@ -156,13 +159,13 @@ class HolisticORSynthetic(Dataset):
         # for world2camera transformation. We return world2camera
         # but with T according to their convention
         R, T = homogenous_to_rot_trans(np.linalg.inv(color2world))
-        ds["R"] = R.T
-        ds["T"] = (-1) * -T
+        ds["R"] = R
+        ds["T"] = T
         return ds
 
     def __getitem__(self, idx):
-        nposes = np.random.choice([1, 2, 3, 4, 5, 6], p=[0.1, 0.1, 0.2, 0.3, 0.2, 0.1])
-        # nposes = np.random.choice(range(1, 10))
+        nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.1, 0.2, 0.4, 0.2])
+        # nposes = np.random.choice(range(1, 6))
         bbox_list = []
         center_list = []
 
@@ -171,8 +174,7 @@ class HolisticORSynthetic(Dataset):
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
         for n in range(0, nposes):
-            if (n >= len(joints_3d)):
-                import ipdb; ipdb.set_trace()
+            # x and y coordinates of joints
             points = joints_3d[n][:, :2].copy()
             center = (points[11, :2] + points[12, :2]) / 2
             rot_rad = np.random.uniform(-180, 180)
@@ -229,15 +231,17 @@ class HolisticORSynthetic(Dataset):
         s = get_scale((width, height), self.image_size)
         r = 0
 
+        # TODO x and y kinect pic
+
         joints = []
         joints_vis = []
         for n in range(nposes):
-            pose2d = project_pose(joints_3d[n], cam)
+            pose2d = project_pose(joints_3d[n], cam, True)
 
-            x_check = np.bitwise_and(pose2d[:, 0] >= 200,
-                                     pose2d[:, 0] <= width - 200)
-            y_check = np.bitwise_and(pose2d[:, 1] >= 200,
-                                     pose2d[:, 1] <= height - 200)
+            x_check = np.bitwise_and(pose2d[:, 0] >= 150,
+                                     pose2d[:, 0] <= width - 150)
+            y_check = np.bitwise_and(pose2d[:, 1] >= 150,
+                                     pose2d[:, 1] <= height - 150)
             check = np.bitwise_and(x_check, y_check)
             vis = joints_3d_vis[n][:, 0] > 0
             vis[np.logical_not(check)] = 0
@@ -339,9 +343,9 @@ class HolisticORSynthetic(Dataset):
             feat_stride = self.image_size / self.heatmap_size
 
             for n in range(nposes):
-                # obscured = random.random() < 0.05
-                # if obscured:
-                #     continue
+                obscured = random.random() < 0.05
+                if obscured:
+                    continue
                 human_scale = 2 * self.compute_human_scale(joints[n] / feat_stride, joints_vis[n])
                 if human_scale == 0:
                     continue
@@ -459,16 +463,16 @@ class HolisticORSynthetic(Dataset):
             width = self.image_size[0]
             height = self.image_size[1]
             center_3d = np.hstack((new_center_us, [[origin_z_offset]]))
-            loc_2d = project_pose(center_3d, cam)
+            loc_2d = project_pose(center_3d, cam, True) 
             # print(center_3d, "->", loc_2d)
             # TODO: make this offset configurable. Why does Voxelpose use width x height here?
-            if 200 < loc_2d[0, 0] < width - 200 and 200 < loc_2d[0, 1] < height - 200:
+            if 10 < loc_2d[0, 0] < width - 10 and 10 < loc_2d[0, 1] < height - 10:
                 # print(f"Cam {cam['id']} visible")
                 vis += 1
 
         # print("Views visible: ", vis)
         if len(bbox_list) == 0:
-            return vis >= 2
+            return vis >= 3
 
         bbox_list = np.array(bbox_list)
         x0 = np.maximum(bbox[0], bbox_list[:, 0])
@@ -481,7 +485,7 @@ class HolisticORSynthetic(Dataset):
         area_list = (bbox_list[:, 2] - bbox_list[:, 0]) * (bbox_list[:, 3] - bbox_list[:, 1])
         iou_list = intersection / (area + area_list - intersection)
 
-        return vis >= 2 and np.max(iou_list) < 0.01
+        return vis >= 3 and np.max(iou_list) < 0.01
 
     @staticmethod
     def calc_bbox(pose, pose_vis):
