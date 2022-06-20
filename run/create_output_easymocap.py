@@ -10,7 +10,7 @@ It tracks the people through easy euclidian distance between each frame
 '''
 
 
-def prepare_out_dirs(prefix='output_easymocap/', dataDir='keypoints3d'):
+def prepare_out_dirs(prefix='output_easymocap_2/', dataDir='keypoints3d'):
     output_dir = os.path.join(prefix, dataDir)
     if os.path.exists(output_dir) and os.path.isdir(output_dir):
         shutil.rmtree(output_dir)
@@ -26,7 +26,7 @@ def convToEasyMocap(preds):
         file_path= os.path.join(output_dir, file_name)
         for pred in frame:
                 pred['id'] = int(pred['id'])
-                pred['keypoints3d'] = pred['keypoints3d'] / 1000
+                pred['keypoints3d'][:, :3] = pred['keypoints3d'][:, :3] / 1000
                 pred['keypoints3d'] = [[round(c, 3) for c in row] for row in pred['keypoints3d'].tolist()]
 
         json_string = json.dumps(frame)
@@ -38,7 +38,7 @@ def convToEasyMocap(preds):
 
 def main():
     res = []
-    with open('output_vis/pred_voxelpose.pkl', 'rb') as f:
+    with open('output_vis_2/pred_voxelpose.pkl', 'rb') as f:
         preds = pickle.load(f)
         first_frame = preds[2000]
 
@@ -51,6 +51,9 @@ def main():
         # we start with second frame
         for i, (k, v) in enumerate(preds.items()):
             dist_matrix = []
+            # TODO THIS IS HARD CODED NEEDS TO CHANGE, SETS MAX PEOPLE TO 2
+            if len(v) > 2:
+                v = v[:2]
             for pred in v:
                 # only the 3 coordinates
                 pred = pred[:, :-2]
@@ -63,16 +66,17 @@ def main():
                 dist_matrix.append(dist_row)
             
             # dist_matrix = [
-            # [dist_first_person_to_id_0...]
-            # [dist_second_person_to_id_0...]
+            #   [dist_first_person_to_id_0, dist_first_person_to_id_1, ...]
+            #   [dist_second_person_to_id_0, dist_second_person_to_id_1,...]
             # ]
             dist_matrix = np.array(dist_matrix)
             res_temp_list = []
             for l in range(len(dist_matrix)):
                 ind = dist_matrix[:, l].argmin()
+                kp_3d = np.concatenate((v[ind][:, :-2], v[ind][:, -1].reshape(17, 1)), axis=1)
                 res_temp = {
                     'id': l,
-                    'keypoints3d': v[ind][:, :-2]
+                    'keypoints3d': kp_3d
                 }
                 res_temp_list.append(res_temp)
                 people[l] = v[ind][:, :-2]

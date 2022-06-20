@@ -41,9 +41,12 @@ LIMBS17 = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9
 def parse_args():
     parser = argparse.ArgumentParser(description='Visualize your network')
     parser.add_argument(
-        '--cfg', help='experiment configure file name', required=True, type=str)
+        '--cfg', help='experiment configure file name', type=str, default="./configs/holistic_or/prn64_cpn80x80x20.yaml")
     parser.add_argument(
         '--vis', type=str, nargs='+', default=[], choices=['img2d', 'img3d'])
+    parser.add_argument(
+        '--vis_output', type=str, default="output_vis"
+    )
     
 
     args, rest = parser.parse_known_args()
@@ -185,8 +188,8 @@ def coco17tobody25(points2d):
     return kpts
 
 
-def convToEasyMocap(preds):
-    output_dir = prepare_out_dirs()
+def convToEasyMocap(preds, prefix):
+    output_dir = prepare_out_dirs(prefix, dataDirs=['keypoints3d'])[0]
     for j, (k, v) in enumerate(preds.items()):
         frame_num = '{:06d}'.format(j)
         file_name = frame_num + '.json'
@@ -195,7 +198,7 @@ def convToEasyMocap(preds):
         for i, pred in enumerate(v):
             if pred[0, 3] >= 0:
                 pred = np.delete(pred, 3, axis=1)
-                
+                pred = pred / 1000
                 # pred25 = coco17tobody25(pred[:, :3])
                 # pred25 = pred25 / 1000
                 # thresholds = np.array([pred[:, -1]]).T
@@ -222,11 +225,12 @@ def main():
     args = parse_args()
 
     final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/prn64_cpn80x80x20/'
+    out_prefix = args.vis_output
 
     dirs = []
     for e in args.vis:
         dirs.append(e)
-    prepare_out_dirs(dataDirs=dirs)
+    prepare_out_dirs(prefix=out_prefix, dataDirs=dirs)
 
     gpus = [int(i) for i in config.GPUS.split(',')]
     print('=> Loading data ..')
@@ -285,15 +289,15 @@ def main():
 
             
             if 'img3d' in args.vis:
-                prefix = '{}'.format('output_vis/img3d/')
+                prefix = '{}'.format(f'{out_prefix}/img3d/')
                 save_debug_3d_images(meta[0], pred, '{}_Frame_{}'.format(prefix, l))
             if 'img2d' in args.vis:
-                prefix = '{}'.format('output_vis/img2d/')
+                prefix = '{}'.format(f'{out_prefix}/img2d/')
                 image_2d_with_anno(meta, pred, '{}Frame_{}'.format(prefix, l), 1)
 
-        # convToEasyMocap(preds)
+        # convToEasyMocap(preds, out_prefix)
         # saves the predictions
-        with open(os.path.join('output_vis', 'pred_voxelpose.pkl'), 'wb') as handle:
+        with open(os.path.join(f'{out_prefix}', 'pred_voxelpose.pkl'), 'wb') as handle:
              pickle.dump(preds, handle)
 
 
