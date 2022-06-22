@@ -188,37 +188,6 @@ def coco17tobody25(points2d):
     return kpts
 
 
-def convToEasyMocap(preds, prefix):
-    output_dir = prepare_out_dirs(prefix, dataDirs=['keypoints3d'])[0]
-    for j, (k, v) in enumerate(preds.items()):
-        frame_num = '{:06d}'.format(j)
-        file_name = frame_num + '.json'
-        file_path= os.path.join(output_dir, file_name)
-        data_dict = []
-        for i, pred in enumerate(v):
-            if pred[0, 3] >= 0:
-                pred = np.delete(pred, 3, axis=1)
-                pred = pred / 1000
-                # pred25 = coco17tobody25(pred[:, :3])
-                # pred25 = pred25 / 1000
-                # thresholds = np.array([pred[:, -1]]).T
-                # temp = np.zeros((25, 1))
-                # temp[:thresholds.shape[0], :thresholds.shape[1]] = thresholds
-                # pred25 = np.hstack((pred25, temp))
-                # pred25 = np.around(pred25, 3)
-                # pred25[17:19, 3] = 0.75
-                pred = [[round(c, 3) for c in row] for row in pred.tolist()]
-                pers_dict = {
-                    "id": i,
-                    "keypoints3d":  pred
-                }
-                data_dict.append(pers_dict)
-        json_string = json.dumps(data_dict)
-        with open(file_path, 'w') as outfile:
-            outfile.write(json_string)
-                
-
-
 
 
 def main():
@@ -283,9 +252,10 @@ def main():
                     joint = pre[n] # joint of one person
                     if joint[0, 3] >= 0:
                         # converts back to meters
-                        # joint[:, :3] = joint[:, :3] / 1000
-                        # joint = np.around(joint, 3)
-                        preds[frame_num].append(joint)
+                        joint[:, :3] = joint[:, :3] / 1000
+                        pruned_joint = np.concatenate((joint[:, :3], joint[:, -1].reshape(17, 1)), axis=1)
+                        # joints without the third column
+                        preds[frame_num].append(pruned_joint)
 
             
             if 'img3d' in args.vis:
@@ -295,7 +265,6 @@ def main():
                 prefix = '{}'.format(f'{out_prefix}/img2d/')
                 image_2d_with_anno(meta, pred, '{}Frame_{}'.format(prefix, l), 1)
 
-        # convToEasyMocap(preds, out_prefix)
         # saves the predictions
         with open(os.path.join(f'{out_prefix}', 'pred_voxelpose.pkl'), 'wb') as handle:
              pickle.dump(preds, handle)

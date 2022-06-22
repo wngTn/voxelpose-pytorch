@@ -26,7 +26,7 @@ def convToEasyMocap(preds):
         file_path= os.path.join(output_dir, file_name)
         for pred in frame:
                 pred['id'] = int(pred['id'])
-                pred['keypoints3d'][:, :3] = pred['keypoints3d'][:, :3] / 1000
+                # pred['keypoints3d'][:, :3] = pred['keypoints3d'][:, :3] / 1000
                 pred['keypoints3d'] = [[round(c, 3) for c in row] for row in pred['keypoints3d'].tolist()]
 
         json_string = json.dumps(frame)
@@ -73,7 +73,7 @@ def main():
             res_temp_list = []
             for l in range(len(dist_matrix)):
                 ind = dist_matrix[:, l].argmin()
-                kp_3d = np.concatenate((v[ind][:, :-2], v[ind][:, -1].reshape(17, 1)), axis=1)
+                kp_3d = np.concatenate((v[ind][:, :3], v[ind][:, -1].reshape(17, 1)), axis=1)
                 res_temp = {
                     'id': l,
                     'keypoints3d': kp_3d
