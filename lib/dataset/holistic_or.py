@@ -93,9 +93,9 @@ class HolisticOR(JointsDataset):
         super().__init__(cfg, image_set, is_train, transform)
         self.limbs = LIMBS
         self.num_joints = len(coco_joints_def)
-        self.cam_list = [0, 1, 2, 3, 4, 5]
+        self.cam_list = [0, 1, 2, 3]
         self.num_views = len(self.cam_list)
-        self.frame_range = list(range(2000, 2985, 5))
+        self.frame_range = list(range(5, 5700, 5))
 
         self.pred_pose2d = self._get_pred_pose2d()
         self.db = self._get_db()
@@ -103,7 +103,7 @@ class HolisticOR(JointsDataset):
         self.db_size = len(self.db)
 
     def _get_pred_pose2d(self):
-        file = os.path.join(self.dataset_root, "pred_holistic_or_dekr_coco.pkl")
+        file = os.path.join(self.dataset_root, "pred_trial_17_recording_04_dekr_coco.pkl")
         with open(file, "rb") as pfile:
             logging.info("=> load {}".format(file))
             pred_2d = pickle.load(pfile)
@@ -111,9 +111,6 @@ class HolisticOR(JointsDataset):
         return pred_2d
 
     def _get_db(self):
-        width = 360
-        height = 288
-
         db = []
         cameras = self._get_cams()
 
@@ -121,52 +118,60 @@ class HolisticOR(JointsDataset):
         # data = scio.loadmat(datafile)
         # actor_3d = np.array(np.array(data['actor3D'].tolist()).tolist()).squeeze()  # num_person * num_frame
 
-        num_person = 6
         # num_frames = len(actor_3d[0])
 
         for i in self.frame_range:
-            for k, cam in cameras.items():
-                image = osp.join("cn0" + str(int(k) + 1), "{1:010d}_color.jpg".format(k, i))
+            # check if all files exist
+            frame_exists = True
+            for c in range(len(cameras)):
+                f_path = osp.join(self.dataset_root, "cn0" + str(int(c) + 1), "{1:010d}_color.jpg".format(c, i))
+                if not osp.exists(f_path):
+                    frame_exists = False
+                    break
+            # only when all frames exist, add it to the database
+            if frame_exists:
+                for k, cam in cameras.items():
+                    image = osp.join("cn0" + str(int(k) + 1), "{1:010d}_color.jpg".format(k, i))
 
-                all_poses_3d = []
-                all_poses_vis_3d = []
-                all_poses = []
-                all_poses_vis = []
-                preds = []
-                # for person in range(num_person):
-                #     pose3d = actor_3d[person][i] * 1000.0
-                #     if len(pose3d[0]) > 0:
-                #         all_poses_3d.append(pose3d)
-                #         all_poses_vis_3d.append(np.ones((self.num_joints, 3)))
+                    all_poses_3d = []
+                    all_poses_vis_3d = []
+                    all_poses = []
+                    all_poses_vis = []
+                    preds = []
+                    # for person in range(num_person):
+                    #     pose3d = actor_3d[person][i] * 1000.0
+                    #     if len(pose3d[0]) > 0:
+                    #         all_poses_3d.append(pose3d)
+                    #         all_poses_vis_3d.append(np.ones((self.num_joints, 3)))
 
-                #         pose2d = project_pose(pose3d, cam)
+                    #         pose2d = project_pose(pose3d, cam)
 
-                #         x_check = np.bitwise_and(pose2d[:, 0] >= 0,
-                #                                  pose2d[:, 0] <= width - 1)
-                #         y_check = np.bitwise_and(pose2d[:, 1] >= 0,
-                #                                  pose2d[:, 1] <= height - 1)
-                #         check = np.bitwise_and(x_check, y_check)
+                    #         x_check = np.bitwise_and(pose2d[:, 0] >= 0,
+                    #                                  pose2d[:, 0] <= width - 1)
+                    #         y_check = np.bitwise_and(pose2d[:, 1] >= 0,
+                    #                                  pose2d[:, 1] <= height - 1)
+                    #         check = np.bitwise_and(x_check, y_check)
 
-                #         joints_vis = np.ones((len(pose2d), 1))
-                #         joints_vis[np.logical_not(check)] = 0
-                #         all_poses.append(pose2d)
-                #         all_poses_vis.append(
-                #             np.repeat(
-                #                 np.reshape(joints_vis, (-1, 1)), 2, axis=1))
+                    #         joints_vis = np.ones((len(pose2d), 1))
+                    #         joints_vis[np.logical_not(check)] = 0
+                    #         all_poses.append(pose2d)
+                    #         all_poses_vis.append(
+                    #             np.repeat(
+                    #                 np.reshape(joints_vis, (-1, 1)), 2, axis=1))
 
-                pred_index = '{}_{}'.format(k, i)
-                preds = self.pred_pose2d[pred_index]
-                preds = [np.array(p) for p in preds]
+                    pred_index = '{}_{}'.format(k, i)
+                    preds = self.pred_pose2d[pred_index]
+                    preds = [np.array(p) for p in preds]
 
-                db.append({
-                    'image': osp.join(self.dataset_root, image),
-                    'joints_3d': all_poses_3d,
-                    'joints_3d_vis': all_poses_vis_3d,
-                    'joints_2d': all_poses,
-                    'joints_2d_vis': all_poses_vis,
-                    'camera': cam,
-                    'pred_pose2d': preds
-                })
+                    db.append({
+                        'image': osp.join(self.dataset_root, image),
+                        'joints_3d': all_poses_3d,
+                        'joints_3d_vis': all_poses_vis_3d,
+                        'joints_2d': all_poses,
+                        'joints_2d_vis': all_poses_vis,
+                        'camera': cam,
+                        'pred_pose2d': preds
+                    })
         return db
 
     def _get_cams(self):

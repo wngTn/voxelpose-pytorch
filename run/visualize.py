@@ -41,7 +41,7 @@ LIMBS17 = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9
 def parse_args():
     parser = argparse.ArgumentParser(description='Visualize your network')
     parser.add_argument(
-        '--cfg', help='experiment configure file name', type=str, default="./configs/holistic_or/prn64_cpn80x80x20.yaml")
+        '--cfg', help='experiment configure file name', type=str, required=True)
     parser.add_argument(
         '--vis', type=str, nargs='+', default=[], choices=['img2d', 'img3d'])
     parser.add_argument(
@@ -134,7 +134,7 @@ def image_2d_with_anno(meta, preds, prefix, batch_size):
                         for j in range(17):
                             X_0 = torch.from_numpy(np.array([joint[j, :3]]))
                             X = cameras.project_pose(X_0, meta[m]['camera'], True)
-                            cv2.circle(image, (int(X[0, 0]), int(X[0, 1])), 2, tuple(reversed(255 * np.array(cl.to_rgb(colors[int(n % 10)])))), 4)
+                            cv2.circle(image, (int(X[0, 0]), int(X[0, 1])), 2, tuple(reversed(255 * np.array(cl.to_rgb(colors[int(n % 10)])))), 5)
         images.append(image)
 
     end_image = cv2.hconcat(images)
@@ -193,7 +193,7 @@ def coco17tobody25(points2d):
 def main():
     args = parse_args()
 
-    final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/prn64_cpn80x80x20/'
+    final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_17_recording_04'
     out_prefix = args.vis_output
 
     dirs = []
@@ -244,7 +244,7 @@ def main():
             pred, _, _, _, _, _ = model(meta=meta, targets_3d=targets_3d[0], input_heatmaps=input_heatmap)
             pred = pred.detach().cpu().numpy()
 
-            frame_num = l * 5 + 2000
+            frame_num = (l + 1) * 5
             preds[frame_num] = []
             if pred is not None:
                 pre = pred[0]

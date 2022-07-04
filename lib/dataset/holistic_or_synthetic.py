@@ -54,7 +54,7 @@ class HolisticORSynthetic(Dataset):
         self.joints_def = coco_joints_def
         self.limbs = LIMBS
         self.num_joints = len(coco_joints_def)
-        self.cam_list = [0, 1, 2, 3, 4, 5]
+        self.cam_list = [0, 1, 2, 3]
         self.num_views = len(self.cam_list)
         self.maximum_person = cfg.MULTI_PERSON.MAX_PEOPLE_NUM
 
@@ -443,8 +443,10 @@ class HolisticORSynthetic(Dataset):
         # width of room approximately 4.5m in both x and z direction
         xmin = -1500
         xmax = 1500
+        ymin = -1650
+        ymax = 1650
         if len(center_list) == 0 or random.random() < 0.7:
-            new_center = np.array([np.random.uniform(xmin, xmax), np.random.uniform(xmin, xmax)])
+            new_center = np.array([np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?
@@ -455,7 +457,7 @@ class HolisticORSynthetic(Dataset):
     def isvalid(self, new_center, bbox, bbox_list):
         # TODO: Put this in config?
         # in our coordinate system Y+ is down, so our offset is in the negative Y direction
-        origin_z_offset = np.random.uniform(200, 500)
+        origin_z_offset = np.random.uniform(550, 750)
         new_center_us = new_center.reshape(1, -1)
         vis = 0
         for k, cam in self.cameras.items():
@@ -485,7 +487,7 @@ class HolisticORSynthetic(Dataset):
         area_list = (bbox_list[:, 2] - bbox_list[:, 0]) * (bbox_list[:, 3] - bbox_list[:, 1])
         iou_list = intersection / (area + area_list - intersection)
 
-        return vis >= 3 and np.max(iou_list) < 0.01
+        return vis >= 3 and np.max(iou_list) < 0.05
 
     @staticmethod
     def calc_bbox(pose, pose_vis):
