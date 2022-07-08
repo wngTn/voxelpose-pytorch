@@ -131,10 +131,11 @@ def image_2d_with_anno(meta, preds, prefix, batch_size):
                 for n in range(len(pred)):
                     joint = pred[n]
                     if joint[0, 3] >= 0:
-                        for j in range(17):
-                            X_0 = torch.from_numpy(np.array([joint[j, :3]]))
-                            X = cameras.project_pose(X_0, meta[m]['camera'], True)
-                            cv2.circle(image, (int(X[0, 0]), int(X[0, 1])), 2, tuple(reversed(255 * np.array(cl.to_rgb(colors[int(n % 10)])))), 5)
+                        points3d = torch.from_numpy(joint[:, :3])
+                        points2d = cameras.project_pose(points3d, meta[m]['camera'], True)
+                        for point2d in points2d:
+                            image = cv2.circle(image, (int(point2d[0]), int(point2d[1])), 2, tuple(reversed(255 * np.array(cl.to_rgb(colors[int(n % 10)])))), 5)
+                            
         images.append(image)
 
     end_image = cv2.hconcat(images)
@@ -193,7 +194,7 @@ def coco17tobody25(points2d):
 def main():
     args = parse_args()
 
-    final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_17_recording_04'
+    final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_17_recording_04_test_3'
     out_prefix = args.vis_output
 
     dirs = []
@@ -252,8 +253,7 @@ def main():
                     joint = pre[n] # joint of one person
                     if joint[0, 3] >= 0:
                         # converts back to meters
-                        joint[:, :3] = joint[:, :3] / 1000
-                        pruned_joint = np.concatenate((joint[:, :3], joint[:, -1].reshape(17, 1)), axis=1)
+                        pruned_joint = np.concatenate((joint[:, :3] / 1000, joint[:, -1].reshape(17, 1)), axis=1)
                         # joints without the third column
                         preds[frame_num].append(pruned_joint)
 

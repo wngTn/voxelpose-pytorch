@@ -164,7 +164,7 @@ class HolisticORSynthetic(Dataset):
         return ds
 
     def __getitem__(self, idx):
-        nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.1, 0.2, 0.4, 0.2])
+        nposes = np.random.choice([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], p=[0.025, 0.025, 0.05, 0.05, 0.15, 0.15, 0.25, 0.15, 0.1, 0.05])
         # nposes = np.random.choice(range(1, 6))
         bbox_list = []
         center_list = []
@@ -172,6 +172,10 @@ class HolisticORSynthetic(Dataset):
         select_poses = np.random.choice(self.pose_db, nposes)
         joints_3d = np.array([p['pose'] for p in select_poses])
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
+
+        # WARNING this is offsetting the poses, since our coordinate system starts at -800
+
+        joints_3d[:, :, 2] = joints_3d[:, :, 2] - 800
 
         for n in range(0, nposes):
             # x and y coordinates of joints
@@ -238,10 +242,10 @@ class HolisticORSynthetic(Dataset):
         for n in range(nposes):
             pose2d = project_pose(joints_3d[n], cam, True)
 
-            x_check = np.bitwise_and(pose2d[:, 0] >= 150,
-                                     pose2d[:, 0] <= width - 150)
-            y_check = np.bitwise_and(pose2d[:, 1] >= 150,
-                                     pose2d[:, 1] <= height - 150)
+            x_check = np.bitwise_and(pose2d[:, 0] >= 0,
+                                     pose2d[:, 0] <= width - 1)
+            y_check = np.bitwise_and(pose2d[:, 1] >= 0,
+                                     pose2d[:, 1] <= height - 1)
             check = np.bitwise_and(x_check, y_check)
             vis = joints_3d_vis[n][:, 0] > 0
             vis[np.logical_not(check)] = 0
@@ -441,10 +445,10 @@ class HolisticORSynthetic(Dataset):
     def get_new_center(center_list):
         # TODO: these should also be in config
         # width of room approximately 4.5m in both x and z direction
-        xmin = -1500
-        xmax = 1500
-        ymin = -1650
-        ymax = 1650
+        xmin = -1000
+        xmax = 1000
+        ymin = -1200
+        ymax = 1200
         if len(center_list) == 0 or random.random() < 0.7:
             new_center = np.array([np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)])
         else:
@@ -457,7 +461,7 @@ class HolisticORSynthetic(Dataset):
     def isvalid(self, new_center, bbox, bbox_list):
         # TODO: Put this in config?
         # in our coordinate system Y+ is down, so our offset is in the negative Y direction
-        origin_z_offset = np.random.uniform(550, 750)
+        origin_z_offset = np.random.uniform(-100, 200)
         new_center_us = new_center.reshape(1, -1)
         vis = 0
         for k, cam in self.cameras.items():
@@ -474,7 +478,7 @@ class HolisticORSynthetic(Dataset):
 
         # print("Views visible: ", vis)
         if len(bbox_list) == 0:
-            return vis >= 3
+            return vis >= 2
 
         bbox_list = np.array(bbox_list)
         x0 = np.maximum(bbox[0], bbox_list[:, 0])
@@ -487,7 +491,7 @@ class HolisticORSynthetic(Dataset):
         area_list = (bbox_list[:, 2] - bbox_list[:, 0]) * (bbox_list[:, 3] - bbox_list[:, 1])
         iou_list = intersection / (area + area_list - intersection)
 
-        return vis >= 3 and np.max(iou_list) < 0.05
+        return vis >= 2 and np.max(iou_list) < 0.05
 
     @staticmethod
     def calc_bbox(pose, pose_vis):

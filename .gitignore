@@ -132,9 +132,10 @@ dmypy.json
 **/data/CampusSeq1/Camera*
 **/data/CampusSeq1/Calibration
 **/data/Shelf/Camera*
+**/data/trial_*
 */data/panoptic-toolbox/data/*
 **/output/*
 **/output_vis/*
-**/output_easymocap/*
+**/output*
 */log/*
 **/.vscode/*

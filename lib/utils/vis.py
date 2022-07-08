@@ -12,49 +12,132 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import colors as cl
+
+# panoptic
+LIMBS15 = [[0, 1], [0, 2], [0, 3], [3, 4], [4, 5], [0, 9], [9, 10],
+         [10, 11], [2, 6], [2, 12], [6, 7], [7, 8], [12, 13], [13, 14]]
+
+# # h36m
+# LIMBS17 = [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5], [5, 6], [0, 7], [7, 8],
+#          [8, 9], [9, 10], [8, 14], [14, 15], [15, 16], [8, 11], [11, 12], [12, 13]]
+# coco17
+LIMBS17 = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [11, 13], [13, 15],
+        [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
 
 
-def save_batch_image_with_joints_multi(batch_image,
-                                 batch_joints,
-                                 batch_joints_vis,
-                                 num_person,
-                                 file_name,
-                                 nrow=8,
-                                 padding=2):
+# shelf / campus
+LIMBS14 = [[0, 1], [1, 2], [3, 4], [4, 5], [2, 3], [6, 7], [7, 8], [9, 10],
+          [10, 11], [2, 8], [3, 9], [8, 12], [9, 12], [12, 13]]
+
+colors = ['b', 'g', 'c', 'y', 'm', 'orange', 'pink', 'royalblue', 'lightgreen', 'gold']
+
+
+def save_batch_image_with_joints_multi(batch_images,
+                                metas,
+                                output_dir,
+                                frame_id,
+                                nrow=8,
+                                padding=2):
     '''
-    batch_image: [batch_size, channel, height, width]
-    batch_joints: [batch_size, num_person, num_joints, 3],
-    batch_joints_vis: [batch_size, num_person, num_joints, 1],
+    batch_image: [cam_num, batch_size, channel, height, width]
+    meta[cam_num, 
+        batch_joints: [batch_size, num_person, num_joints, 3],
+        batch_joints_vis: [batch_size, num_person, num_joints, 1],
+    ]
     num_person: [batch_size]
     }
     '''
-    batch_image = batch_image.flip(1)
-    grid = torchvision.utils.make_grid(batch_image, nrow, padding, True)
-    ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()
-    ndarr = ndarr.copy()
+    # Iterate through every camera
+    for cam_num in range(len(batch_images)):
+        batch_image = batch_images[cam_num]
+        batch_joints = metas[cam_num]['joints']
+        batch_joints_vis = metas[cam_num]['joints_vis']
+        num_person = metas[cam_num]['num_person']
 
-    nmaps = batch_image.size(0)
-    xmaps = min(nrow, nmaps)
-    ymaps = int(math.ceil(float(nmaps) / xmaps))
-    height = int(batch_image.size(2) + padding)
-    width = int(batch_image.size(3) + padding)
-    k = 0
-    for y in range(ymaps):
-        for x in range(xmaps):
-            if k >= nmaps:
-                break
-            for n in range(num_person[k]):
-                joints = batch_joints[k, n]
-                joints_vis = batch_joints_vis[k, n]
+        file_name = os.path.join(output_dir, 'image_with_joints', '{:08}_cam_{}.jpg'.format(frame_id, cam_num + 1))
 
-                for joint, joint_vis in zip(joints, joints_vis):
-                    joint[0] = x * width + padding + joint[0]
-                    joint[1] = y * height + padding + joint[1]
-                    if joint_vis[0]:
-                        cv2.circle(ndarr, (int(joint[0]), int(joint[1])), 2,
-                                   [0, 255, 255], 2)
-            k = k + 1
-    cv2.imwrite(file_name, ndarr)
+        batch_image = batch_image.flip(1)
+        grid = torchvision.utils.make_grid(batch_image, nrow, padding, True)
+        ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()
+        ndarr = ndarr.copy()
+
+        ndarr = eval(f"cv2.imread('data/trial_17_recording_04/cn0{cam_num + 1}/0000000005_color.jpg')")
+
+        nmaps = batch_image.size(0)
+        xmaps = min(nrow, nmaps)
+        ymaps = int(math.ceil(float(nmaps) / xmaps))
+        height = int(batch_image.size(2) + padding)
+        width = int(batch_image.size(3) + padding)
+        k = 0
+        for y in range(ymaps):
+            for x in range(xmaps):
+                if k >= nmaps:
+                    break
+                for n in range(num_person[k]):
+                    joints = batch_joints[k, n]
+                    joints_vis = batch_joints_vis[k, n]
+
+                    for i, (joint, joint_vis) in enumerate(zip(joints, joints_vis)):
+                        joint[0] = x * width + padding + joint[0]
+                        joint[1] = y * height + padding + joint[1]
+                        if joint_vis[0]:
+                            cv2.circle(ndarr, (int(joint[0]), int(joint[1])), 2,
+                                    tuple(reversed(255 * np.array(cl.to_rgb(colors[int(n % 10)])))), 2)
+
+                    for l in eval("LIMBS{}".format(len(joints))):
+                        if joints_vis[l[0], 0] and joints_vis[l[1], 0]:
+                            p1 = tuple([int(x * width + padding + joints[l[0], 0]), int(y * height + padding + joints[l[0], 1])])
+                            p2 = tuple([int(x * width + padding + joints[l[1], 0]), int(y * height + padding + joints[l[1], 1])])
+                            cv2.line(ndarr, p1, p2, tuple(reversed(255 * np.array(cl.to_rgb(colors[int(n % 10)])))), 2)
+                    
+                k = k + 1
+
+                
+        cv2.imwrite(file_name, ndarr)
+
+
+# def save_batch_image_with_joints_multi(batch_image,
+#                                  batch_joints,
+#                                  batch_joints_vis,
+#                                  num_person,
+#                                  file_name,
+#                                  nrow=8,
+#                                  padding=2):
+#     '''
+#     batch_image: [batch_size, channel, height, width]
+#     batch_joints: [batch_size, num_person, num_joints, 3],
+#     batch_joints_vis: [batch_size, num_person, num_joints, 1],
+#     num_person: [batch_size]
+#     }
+#     '''
+#     batch_image = batch_image.flip(1)
+#     grid = torchvision.utils.make_grid(batch_image, nrow, padding, True)
+#     ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()
+#     ndarr = ndarr.copy()
+
+#     nmaps = batch_image.size(0)
+#     xmaps = min(nrow, nmaps)
+#     ymaps = int(math.ceil(float(nmaps) / xmaps))
+#     height = int(batch_image.size(2) + padding)
+#     width = int(batch_image.size(3) + padding)
+#     k = 0
+#     for y in range(ymaps):
+#         for x in range(xmaps):
+#             if k >= nmaps:
+#                 break
+#             for n in range(num_person[k]):
+#                 joints = batch_joints[k, n]
+#                 joints_vis = batch_joints_vis[k, n]
+
+#                 for joint, joint_vis in zip(joints, joints_vis):
+#                     joint[0] = x * width + padding + joint[0]
+#                     joint[1] = y * height + padding + joint[1]
+#                     if joint_vis[0]:
+#                         cv2.circle(ndarr, (int(joint[0]), int(joint[1])), 2,
+#                                    [0, 255, 255], 2)
+#             k = k + 1
+#     cv2.imwrite(file_name, ndarr)
 
 
 def save_batch_heatmaps_multi(batch_image, batch_heatmaps, file_name, normalize=True):
@@ -113,6 +196,15 @@ def save_batch_heatmaps_multi(batch_image, batch_heatmaps, file_name, normalize=
     cv2.imwrite(file_name, grid_image)
 
 
+def save_debug_images_joints(config, inputs, metas, output_dir, frame_id):
+    if not config.DEBUG.DEBUG:
+        return
+
+    if config.DEBUG.SAVE_BATCH_IMAGES_GT:
+        save_batch_image_with_joints_multi(inputs, metas, output_dir, frame_id)
+
+
+
 def save_debug_images_multi(config, input, meta, target, output, prefix):
     if not config.DEBUG.DEBUG:
         return
@@ -129,27 +221,10 @@ def save_debug_images_multi(config, input, meta, target, output, prefix):
     prefix1 = os.path.join(dirname1, basename)
     prefix2 = os.path.join(dirname2, basename)
 
-    if config.DEBUG.SAVE_BATCH_IMAGES_GT:
-        save_batch_image_with_joints_multi(input, meta['joints'], meta['joints_vis'], meta['num_person'], '{}_gt.jpg'.format(prefix1))
     if config.DEBUG.SAVE_HEATMAPS_GT:
         save_batch_heatmaps_multi(input, target, '{}_hm_gt.jpg'.format(prefix2))
     if config.DEBUG.SAVE_HEATMAPS_PRED:
         save_batch_heatmaps_multi(input, output, '{}_hm_pred.jpg'.format(prefix2))
-
-# panoptic
-LIMBS15 = [[0, 1], [0, 2], [0, 3], [3, 4], [4, 5], [0, 9], [9, 10],
-         [10, 11], [2, 6], [2, 12], [6, 7], [7, 8], [12, 13], [13, 14]]
-
-# # h36m
-# LIMBS17 = [[0, 1], [1, 2], [2, 3], [0, 4], [4, 5], [5, 6], [0, 7], [7, 8],
-#          [8, 9], [9, 10], [8, 14], [14, 15], [15, 16], [8, 11], [11, 12], [12, 13]]
-# coco17
-LIMBS17 = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [11, 13], [13, 15],
-        [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
-
-# shelf / campus
-LIMBS14 = [[0, 1], [1, 2], [3, 4], [4, 5], [2, 3], [6, 7], [7, 8], [9, 10],
-          [10, 11], [2, 8], [3, 9], [8, 12], [9, 12], [12, 13]]
 
 
 def save_debug_3d_images(config, meta, preds, prefix):
@@ -198,7 +273,6 @@ def save_debug_3d_images(config, meta, preds, prefix):
                     ax.plot(x, y, z, c='r', ls='--', lw=1.5, marker='o', markerfacecolor='w', markersize=2,
                             markeredgewidth=1)
 
-        colors = ['b', 'g', 'c', 'y', 'm', 'orange', 'pink', 'royalblue', 'lightgreen', 'gold']
         if preds is not None:
             pred = preds[i]
             for n in range(len(pred)):

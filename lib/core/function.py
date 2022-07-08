@@ -9,7 +9,7 @@ import os
 import torch
 import numpy as np
 
-from utils.vis import save_debug_images_multi
+from utils.vis import save_debug_images_multi, save_debug_images_joints
 from utils.vis import save_debug_3d_images
 from utils.vis import save_debug_3d_cubes
 
@@ -99,6 +99,9 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
                 prefix = '{}_{:08}_{}'.format(
                     os.path.join(output_dir, 'train'), i, view_name)
                 save_debug_images_multi(config, inputs[k], meta[k], targets_2d[k], heatmaps[k], prefix)
+
+
+            save_debug_images_joints(config, inputs, meta, output_dir, i)
             prefix2 = '{}_{:08}'.format(
                 os.path.join(output_dir, 'train'), i)
 
@@ -145,6 +148,8 @@ def validate_3d(config, model, loader, output_dir):
                     prefix = '{}_{:08}_{}'.format(
                         os.path.join(output_dir, 'validation'), i, view_name)
                     save_debug_images_multi(config, inputs[k], meta[k], targets_2d[k], heatmaps[k], prefix)
+
+                save_debug_images_joints(config, inputs, meta, output_dir, i)
                 prefix2 = '{}_{:08}'.format(
                     os.path.join(output_dir, 'validation'), i)
 

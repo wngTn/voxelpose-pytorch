@@ -10,7 +10,7 @@ It tracks the people through easy euclidian distance between each frame
 '''
 
 
-def prepare_out_dirs(prefix='output_easymocap_2/', dataDir='keypoints3d'):
+def prepare_out_dirs(prefix='output_easymocap_trial_17_recording_04/', dataDir='keypoints3d'):
     output_dir = os.path.join(prefix, dataDir)
     if os.path.exists(output_dir) and os.path.isdir(output_dir):
         shutil.rmtree(output_dir)
@@ -35,33 +35,54 @@ def convToEasyMocap(preds):
             print('Saved:', file_path)
 
 
+def distance_two_people(p1, p2):
+    """
+    Calculates the distance of two people based on where their hips are:
+    (joints_3d_u[:, 11] + joints_3d_u[:, 12]) / 2.0
+
+    :param p1: keypoints of person 1
+    :param p2: keypoints of person 2
+    """
+
+    hip_p1 = (p1[11, :] + p1[12, :]) / 2.0
+    hip_p2 = (p2[11, :] + p2[12, :]) / 2.0
+
+    distance = np.linalg.norm(hip_p1 - hip_p2)
+
+    return distance
+
 
 def main():
     res = []
-    with open('output_vis_2/pred_voxelpose.pkl', 'rb') as f:
+    with open('output_trial_17_recording_04_test_3/pred_voxelpose.pkl', 'rb') as f:
         preds = pickle.load(f)
-        first_frame = preds[2000]
+        first_frame = preds[5]
 
-        # list of the positions of all the people in the first frame
-        # WARNING: For this all people must appear in the first frame
+        # # list of the positions of all the people in the first frame
+        # # people:
+        # # {
+        # # <id> : previous_keypoints
+        # # <id> : previous_keypoints
+        # # }
+        # people = {}
+        # for i in range(len(first_frame)):
+        #     people[i] = first_frame[i][:, :3]
+
         people = {}
-        for i in range(len(first_frame)):
-            people[i] = first_frame[i][:, :-2]
 
         # we start with second frame
         for i, (k, v) in enumerate(preds.items()):
+            v = np.array(v)
             dist_matrix = []
+            pred_kps = v[:, :, :3]
             # TODO THIS IS HARD CODED NEEDS TO CHANGE, SETS MAX PEOPLE TO 2
-            if len(v) > 2:
-                v = v[:2]
-            for pred in v:
-                # only the 3 coordinates
-                pred = pred[:, :-2]
+
+            for pred in pred_kps:
                 # calculate distance with first person, second person and so on
                 # dist_row = [dist_to_id_0, dist_to_id_1, dist_to_id_2]
                 dist_row = []
-                for k, predecessor in people.items():
-                    dist_row.append(np.sum(np.linalg.norm(pred - predecessor)))
+                for persond_id, predecessor_kps in people.items():
+                    dist_row.append(distance_two_people(pred, predecessor_kps))
 
                 dist_matrix.append(dist_row)
             
@@ -70,18 +91,75 @@ def main():
             #   [dist_second_person_to_id_0, dist_second_person_to_id_1,...]
             # ]
             dist_matrix = np.array(dist_matrix)
-            res_temp_list = []
-            for l in range(len(dist_matrix)):
-                ind = dist_matrix[:, l].argmin()
-                kp_3d = np.concatenate((v[ind][:, :3], v[ind][:, -1].reshape(17, 1)), axis=1)
-                res_temp = {
-                    'id': l,
-                    'keypoints3d': kp_3d
-                }
-                res_temp_list.append(res_temp)
-                people[l] = v[ind][:, :-2]
 
-            res.append(res_temp_list)
+            # dict that saves the person_ids and respective ids of the <v> of the people in the current frame
+            current_frame = {}
+            for person_id in range(dist_matrix.shape[1]):
+                # the nearest person of <person_id> is <nearest_person_id>
+                nearest_person_id = np.argmin(dist_matrix[:, person_id])
+
+                # check if the <person_id> already has a nearest person
+                if nearest_person_id not in list(current_frame.values()):
+                    # if not put <person_id> : kps_previous frame to the dict
+                    current_frame[person_id] = nearest_person_id
+                else:
+                    # <person_id> already has a nearest person
+                    # check if the new nearest_person_id is even nearer
+                    if dist_matrix[nearest_person_id, person_id] < dist_matrix[nearest_person_id, 
+                        list(current_frame.keys())[list(current_frame.values()).index(nearest_person_id)] # key of nearest_person_id
+                    ]:
+                        # if so, put it in the current frame
+                        del current_frame[list(current_frame.keys())[list(current_frame.values()).index(nearest_person_id)]]
+                        current_frame[person_id] = nearest_person_id
+            
+            # current_fame = {
+            # <person_id> : kp_id,
+            # <person_id> : kp_id,
+            # }
+
+            # check residual kp_ids with the person_id. If there is an entry in "people". If so, update
+            for kp_id in range(len(pred_kps)):
+                # check if it's actual residual
+                if kp_id not in list(current_frame.values()):
+
+                    dist_kp_id_other_people = {}
+
+                    # check every person_id that is not in current_frame
+                    for p_id, kps in people.items():
+                        if p_id not in current_frame:
+
+                            dist = distance_two_people(pred_kps[kp_id], kps)
+                            dist_kp_id_other_people[p_id] = dist
+
+
+                    if len(people) == 0:
+                        current_frame[kp_id] = kp_id
+
+                    else: 
+                        try: 
+                            min_key_dist_kp_id_other_people = min(dist_kp_id_other_people, key=dist_kp_id_other_people.get)
+
+                            # There is already an entry, update it
+                            if dist_kp_id_other_people[min_key_dist_kp_id_other_people] < 0.05:
+                                current_frame[min_key_dist_kp_id_other_people] = kp_id
+
+                        except:
+                            current_frame[len(people)] = kp_id
+
+
+            # update people and write result
+            result_frame = []
+            for kk, vv in current_frame.items():
+                people[kk] = pred_kps[vv]
+
+                # write to result
+                res_temp = {
+                    'id': kk,
+                    'keypoints3d': v[vv]
+                }
+                result_frame.append(res_temp)
+            
+            res.append(result_frame)
         convToEasyMocap(res)
 
 
