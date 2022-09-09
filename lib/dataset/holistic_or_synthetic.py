@@ -151,6 +151,8 @@ class HolisticORSynthetic(Dataset):
         depth2world = YZ_SWAP @ ext_homo @ yz_flip
         # print(f"{cam} extrinsics:", depth2world)
 
+        if os.path.basename(self.dataset_root) == "trial_08_recording_04_calibrated":
+            depth2world = depth2world @ CALIBRATION_TRIAL_08_RECORDING_04[int(cam[-1]) - 1]
         # depth_R, depth_T = homogenous_to_rot_trans(depth2world)
         # ds["depth2world"] = depth2world
         color2world = depth2world @ np.linalg.inv(depth2color)
@@ -500,3 +502,33 @@ class HolisticORSynthetic(Dataset):
                 np.max(pose[index, 0]), np.max(pose[index, 1])]
 
         return np.array(bbox)
+
+CALIBRATION_TRIAL_08_RECORDING_04 = np.array(
+    [
+        np.eye(4),
+        np.array(
+            [
+                [1, 0, 0, -0.0125 * 1000],
+                [0, 1, 0, -0.0125 * 1000],
+                [0, 0, 1, 0], 
+                [0, 0, 0, 1]
+            ]
+        ),
+        np.array(
+            [
+                [1, 0, 0, 0.025 * 1000],
+                [0, 1, 0, 0.01 * 1000],
+                [0, 0, 1, -0.01 * 1000], 
+                [0, 0, 0, 1]
+            ]
+        ),
+        np.array(
+            [
+                [1, 0, 0, 0.003 * 1000],
+                [0, 1, 0, -0.018 * 1000],
+                [0, 0, 1, 0.0125 * 1000], 
+                [0, 0, 0, 1]
+            ]
+        )
+    ]
+)

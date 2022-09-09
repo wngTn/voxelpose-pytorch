@@ -137,5 +137,6 @@ dmypy.json
 **/output/*
 **/output_vis/*
 **/output*
-*/log/*
+**/log/*
 **/.vscode/*
+tmp/*

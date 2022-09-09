@@ -38,40 +38,6 @@ from utils.cameras_cpu import rot_trans_to_homogenous, homogenous_to_rot_trans
 from utils.cameras_cpu import rotation_to_homogenous
 from scipy.spatial.transform import Rotation
 
-# CAMPUS_JOINTS_DEF = {
-#     'Right-Ankle': 0,
-#     'Right-Knee': 1,
-#     'Right-Hip': 2,
-#     'Left-Hip': 3,
-#     'Left-Knee': 4,
-#     'Left-Ankle': 5,
-#     'Right-Wrist': 6,
-#     'Right-Elbow': 7,
-#     'Right-Shoulder': 8,
-#     'Left-Shoulder': 9,
-#     'Left-Elbow': 10,
-#     'Left-Wrist': 11,
-#     'Bottom-Head': 12,
-#     'Top-Head': 13
-# }
-
-# LIMBS = [
-#     [0, 1],
-#     [1, 2],
-#     [3, 4],
-#     [4, 5],
-#     [2, 3],
-#     [6, 7],
-#     [7, 8],
-#     [9, 10],
-#     [10, 11],
-#     [2, 8],
-#     [3, 9],
-#     [8, 12],
-#     [9, 12],
-#     [12, 13]
-# ]
-
 coco_joints_def = {0: 'nose',
                    1: 'Leye', 2: 'Reye', 3: 'Lear', 4: 'Rear',
                    5: 'Lsho', 6: 'Rsho',
@@ -95,7 +61,7 @@ class HolisticOR(JointsDataset):
         self.num_joints = len(coco_joints_def)
         self.cam_list = [0, 1, 2, 3]
         self.num_views = len(self.cam_list)
-        self.frame_range = list(range(5, 5700, 5))
+        self.frame_range = list(range(0, 9000, 5))
 
         self.pred_pose2d = self._get_pred_pose2d()
         self.db = self._get_db()
@@ -103,7 +69,7 @@ class HolisticOR(JointsDataset):
         self.db_size = len(self.db)
 
     def _get_pred_pose2d(self):
-        file = os.path.join(self.dataset_root, "pred_trial_17_recording_04_dekr_coco.pkl")
+        file = os.path.join(self.dataset_root, f"pred_{os.path.basename(self.dataset_root)}_dekr_coco.pkl")
         with open(file, "rb") as pfile:
             logging.info("=> load {}".format(file))
             pred_2d = pickle.load(pfile)
@@ -236,6 +202,9 @@ class HolisticOR(JointsDataset):
         depth2world = YZ_SWAP @ ext_homo @ yz_flip
         # print(f"{cam} extrinsics:", depth2world)
 
+        if os.path.basename(self.dataset_root) == "trial_08_recording_04_calibrated":
+            depth2world = depth2world @ CALIBRATION_TRIAL_08_RECORDING_04[int(cam[-1]) - 1]
+
         # depth_R, depth_T = homogenous_to_rot_trans(depth2world)
         # ds["depth2world"] = depth2world
         color2world = depth2world @ np.linalg.inv(depth2color)
@@ -345,3 +314,33 @@ class HolisticOR(JointsDataset):
         campus_pose[13] += head_top
 
         return campus_pose
+
+CALIBRATION_TRIAL_08_RECORDING_04 = np.array(
+    [
+        np.eye(4),
+        np.array(
+            [
+                [1, 0, 0, -0.0125 * 1000],
+                [0, 1, 0, -0.0125 * 1000],
+                [0, 0, 1, 0], 
+                [0, 0, 0, 1]
+            ]
+        ),
+        np.array(
+            [
+                [1, 0, 0, 0.025 * 1000],
+                [0, 1, 0, 0.01 * 1000],
+                [0, 0, 1, -0.01 * 1000], 
+                [0, 0, 0, 1]
+            ]
+        ),
+        np.array(
+            [
+                [1, 0, 0, 0.003 * 1000],
+                [0, 1, 0, -0.018 * 1000],
+                [0, 0, 1, 0.0125 * 1000], 
+                [0, 0, 0, 1]
+            ]
+        )
+    ]
+)

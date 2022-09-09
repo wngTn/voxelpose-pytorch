@@ -194,8 +194,13 @@ def coco17tobody25(points2d):
 def main():
     args = parse_args()
 
-    final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_17_recording_04_test_3'
-    out_prefix = args.vis_output
+    exp_name = 'trial_17_recording_03_04'
+    final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/' + exp_name
+    out_prefix = args.vis_output + '/' + exp_name
+
+
+    # MODEL_PATH = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_08_recording_04_calibrated/model_best.pth.tar'
+    MODEL_PATH = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_17_recording_03_04/final_state.pth.tar'
 
     dirs = []
     for e in args.vis:
@@ -231,7 +236,8 @@ def main():
     with torch.no_grad():
         model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
-    test_model_file = os.path.join(final_output_dir, config.TEST.MODEL_FILE)
+    # test_model_file = os.path.join(final_output_dir, config.TEST.MODEL_FILE)
+    test_model_file = MODEL_PATH
     if config.TEST.MODEL_FILE and os.path.isfile(test_model_file):
         print('=> load models state {}'.format(test_model_file))
         model.module.load_state_dict(torch.load(test_model_file))
@@ -245,7 +251,8 @@ def main():
             pred, _, _, _, _, _ = model(meta=meta, targets_3d=targets_3d[0], input_heatmaps=input_heatmap)
             pred = pred.detach().cpu().numpy()
 
-            frame_num = (l + 1) * 5
+            # WARNING
+            frame_num = l # * 5
             preds[frame_num] = []
             if pred is not None:
                 pre = pred[0]
