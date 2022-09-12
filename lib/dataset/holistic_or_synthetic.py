@@ -47,6 +47,15 @@ LIMBS = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9],
          [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
 
 
+# Generate values between an intervall with normal distribution
+from scipy.stats import truncnorm
+def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
+    return truncnorm((low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
+
+X_axis = get_truncated_normal(mean=0, sd=1000, low=-1500, upp=1500)
+Y_axis = get_truncated_normal(mean=0, sd=1650, low=-2500, upp=2500)
+
+
 class HolisticORSynthetic(Dataset):
     def __init__(self, cfg, image_set, is_train, transform=None):
         super().__init__()
@@ -84,7 +93,7 @@ class HolisticORSynthetic(Dataset):
         self.space_center = np.array(cfg.MULTI_PERSON.SPACE_CENTER)
         self.initial_cube_size = np.array(cfg.MULTI_PERSON.INITIAL_CUBE_SIZE)
 
-        pose_db_file = os.path.join(self.dataset_root, "..", "panoptic_training_pose.pkl")
+        pose_db_file = os.path.join("data/panoptic_training_pose.pkl")
         self.pose_db = pickle.load(open(pose_db_file, "rb"))
         self.cameras = self._get_cams()
 
@@ -166,8 +175,8 @@ class HolisticORSynthetic(Dataset):
         return ds
 
     def __getitem__(self, idx):
-        nposes = np.random.choice([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], p=[0.025, 0.025, 0.05, 0.05, 0.15, 0.15, 0.25, 0.15, 0.1, 0.05])
-        # nposes = np.random.choice(range(1, 6))
+        # nposes = np.random.choice([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], p=[0.025, 0.025, 0.05, 0.05, 0.15, 0.15, 0.25, 0.15, 0.1, 0.05])
+        nposes = np.random.choice(range(1, 10))
         bbox_list = []
         center_list = []
 
@@ -175,8 +184,7 @@ class HolisticORSynthetic(Dataset):
         joints_3d = np.array([p['pose'] for p in select_poses])
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
-        # WARNING this is offsetting the poses, since our coordinate system starts at -800
-
+        # WARNING this is offsetting the poses, since our floor starts at -800
         joints_3d[:, :, 2] = joints_3d[:, :, 2] - 800
 
         for n in range(0, nposes):
@@ -229,8 +237,8 @@ class HolisticORSynthetic(Dataset):
         nposes = len(joints_3d)
 
         # TODO: need to move these to configs as well
-        width = self.image_size[0]
-        height = self.image_size[1]
+        width = 2048
+        height = 1536
         c = np.array([width / 2.0, height / 2.0], dtype=np.float32)
         # s = np.array(
         #     [width / self.pixel_std, height / self.pixel_std], dtype=np.float32)
@@ -445,14 +453,8 @@ class HolisticORSynthetic(Dataset):
 
     @staticmethod
     def get_new_center(center_list):
-        # TODO: these should also be in config
-        # width of room approximately 4.5m in both x and z direction
-        xmin = -1000
-        xmax = 1000
-        ymin = -1200
-        ymax = 1200
         if len(center_list) == 0 or random.random() < 0.7:
-            new_center = np.array([np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)])
+            new_center = np.array([X_axis.rvs(), Y_axis.rvs()])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?
@@ -461,25 +463,18 @@ class HolisticORSynthetic(Dataset):
         return new_center
 
     def isvalid(self, new_center, bbox, bbox_list):
-        # TODO: Put this in config?
-        # in our coordinate system Y+ is down, so our offset is in the negative Y direction
-        origin_z_offset = np.random.uniform(-100, 200)
         new_center_us = new_center.reshape(1, -1)
         vis = 0
+        width = 2048
+        height = 1536
+
         for k, cam in self.cameras.items():
-            # TODO: why so conservative with pixel coordinates?
-            width = self.image_size[0]
-            height = self.image_size[1]
-            center_3d = np.hstack((new_center_us, [[origin_z_offset]]))
-            loc_2d = project_pose(center_3d, cam, True) 
-            # print(center_3d, "->", loc_2d)
-            # TODO: make this offset configurable. Why does Voxelpose use width x height here?
+            loc_2d = project_pose(np.hstack((new_center_us, [[200.0]])), cam, True)
             if 10 < loc_2d[0, 0] < width - 10 and 10 < loc_2d[0, 1] < height - 10:
-                # print(f"Cam {cam['id']} visible")
                 vis += 1
 
-        # print("Views visible: ", vis)
         if len(bbox_list) == 0:
+            # === at least visible from two cameras
             return vis >= 2
 
         bbox_list = np.array(bbox_list)
@@ -493,7 +488,7 @@ class HolisticORSynthetic(Dataset):
         area_list = (bbox_list[:, 2] - bbox_list[:, 0]) * (bbox_list[:, 3] - bbox_list[:, 1])
         iou_list = intersection / (area + area_list - intersection)
 
-        return vis >= 2 and np.max(iou_list) < 0.05
+        return vis >= 2 and np.max(iou_list) < 0.01
 
     @staticmethod
     def calc_bbox(pose, pose_vis):
@@ -502,6 +497,7 @@ class HolisticORSynthetic(Dataset):
                 np.max(pose[index, 0]), np.max(pose[index, 1])]
 
         return np.array(bbox)
+
 
 CALIBRATION_TRIAL_08_RECORDING_04 = np.array(
     [
