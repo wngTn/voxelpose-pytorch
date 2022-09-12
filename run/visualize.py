@@ -4,6 +4,7 @@ import torchvision
 import cv2
 import os
 import matplotlib
+from pathlib import Path
 
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
@@ -45,7 +46,7 @@ def parse_args():
     parser.add_argument(
         '--vis', type=str, nargs='+', default=[], choices=['img2d', 'img3d'])
     parser.add_argument(
-        '--vis_output', type=str, default="output_vis"
+        '--vis_output', type=str, default="visualized_output"
     )
     
 
@@ -189,18 +190,38 @@ def coco17tobody25(points2d):
     return kpts
 
 
+def save_easymocap_output(preds, experiment_name):
+    output_dir = os.path.join("output_easymocap", experiment_name, "keypoints3d")
+    if os.path.exists(output_dir) and os.path.isdir(output_dir):
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
+    for k, v in enumerate(preds.items()):
+        frame_num = '{:06d}'.format(k)
+        file_name = frame_num + '.json'
+        file_path = os.path.join(output_dir, file_name)
+        frame = []
+        for j, vv in enumerate(v):
+            res_temp = {
+                'id' : j,
+                'keypoints3d' : [
+                    [round(c, 3) for c in row] for row in vv
+                ]
+            }
+            frame.append(res_temp)
+        json_string = json.dump(frame)
+        with open(file_path, 'w') as outfile:
+            outfile.write(json_string)
+            print('Saved:', file_path)
 
 def main():
     args = parse_args()
 
-    exp_name = 'trial_17_recording_03_04'
-    final_output_dir = 'output/holistic_or_synthetic/multi_person_posenet_50/' + exp_name
-    out_prefix = args.vis_output + '/' + exp_name
+    experiment_name = Path(args.vis).stem
+    out_prefix = args.vis_output + '/' + experiment_name
 
-
-    # MODEL_PATH = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_08_recording_04_calibrated/model_best.pth.tar'
-    MODEL_PATH = 'output/holistic_or_synthetic/multi_person_posenet_50/trial_17_recording_03_04/final_state.pth.tar'
+    MODEL_PATH = os.path.join("output", "holistic_or_synthetic", "multi_person_posenet_50", experiment_name, "final_state.pth.tar")
+    assert(os.path.exists(MODEL_PATH))
 
     dirs = []
     for e in args.vis:
@@ -236,7 +257,6 @@ def main():
     with torch.no_grad():
         model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
-    # test_model_file = os.path.join(final_output_dir, config.TEST.MODEL_FILE)
     test_model_file = MODEL_PATH
     if config.TEST.MODEL_FILE and os.path.isfile(test_model_file):
         print('=> load models state {}'.format(test_model_file))
@@ -252,7 +272,7 @@ def main():
             pred = pred.detach().cpu().numpy()
 
             # WARNING
-            frame_num = l # * 5
+            frame_num = l 
             preds[frame_num] = []
             if pred is not None:
                 pre = pred[0]
@@ -267,14 +287,16 @@ def main():
             
             if 'img3d' in args.vis:
                 prefix = '{}'.format(f'{out_prefix}/img3d/')
-                save_debug_3d_images(meta[0], pred, '{}_Frame_{}'.format(prefix, l))
+                save_debug_3d_images(meta[0], pred, f'{prefix}{str(l).zfill(4)}')
             if 'img2d' in args.vis:
                 prefix = '{}'.format(f'{out_prefix}/img2d/')
-                image_2d_with_anno(meta, pred, '{}Frame_{}'.format(prefix, l), 1)
+                image_2d_with_anno(meta, pred, f'{prefix}{str(l).zfill(4)}', 1)
 
         # saves the predictions
-        with open(os.path.join(f'{out_prefix}', 'pred_voxelpose.pkl'), 'wb') as handle:
+        with open(os.path.join(f'{out_prefix}', f'pred_{experiment_name}.pkl'), 'wb') as handle:
              pickle.dump(preds, handle)
+
+        save_easymocap_output(preds, experiment_name)
 
 
 if __name__ == '__main__':
