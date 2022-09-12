@@ -18,7 +18,7 @@ DATASET:
   DATA_FORMAT: jpeg
   DATA_AUGMENTATION: False
   FLIP: False
-  ROOT: './data/trial_17_recording_04' # where to get the cameras
+  ROOT: './data/trial_calibrations/calibrations_13' # where to get the cameras
   ROT_FACTOR: 45
   SCALE_FACTOR: 0.35
   TEST_SUBSET: 'validation'
@@ -43,7 +43,7 @@ NETWORK:
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
-  BATCH_SIZE: 1
+  BATCH_SIZE: 6
   SHUFFLE: true
   BEGIN_EPOCH: 0
   END_EPOCH: 30
@@ -61,7 +61,7 @@ MULTI_PERSON:
   SPACE_SIZE:
     - 3800.0 # X is the short side
     - 5400.0 # Y the long side
-    - 2900.0
+    - 3000.0
   SPACE_CENTER:
     - 0.0
     - 0.0
@@ -81,3 +81,5 @@ PICT_STRUCT:
     - 64
     - 64
     - 64
+
+

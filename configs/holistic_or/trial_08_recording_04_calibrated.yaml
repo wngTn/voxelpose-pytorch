@@ -18,7 +18,7 @@ DATASET:
   DATA_FORMAT: jpeg
   DATA_AUGMENTATION: False
   FLIP: False
-  ROOT: './data/trial_17_recording_04' # where to get the cameras
+  ROOT: './data/trial_08_recording_04' # where to get the cameras
   ROT_FACTOR: 45
   SCALE_FACTOR: 0.35
   TEST_SUBSET: 'validation'
@@ -43,7 +43,7 @@ NETWORK:
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
-  BATCH_SIZE: 1
+  BATCH_SIZE: 6
   SHUFFLE: true
   BEGIN_EPOCH: 0
   END_EPOCH: 30

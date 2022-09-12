@@ -1,0 +1,7 @@
+211102_animal_trial_08_TIP2
+211102_animal_trial_08_TIP
+211102_animal_trial_08_WAIT
+211102_animal_trial_08_PIN2
+211102_animal_trial_08_PIN
+211102_animal_trial_08_PREP
+211102_animal_trial_08_POUT

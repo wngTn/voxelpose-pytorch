@@ -59,13 +59,13 @@ DEBUG:
   SAVE_HEATMAPS_PRED: true
 MULTI_PERSON:
   SPACE_SIZE:
-    - 3800.0 # X is the short side
-    - 5400.0 # Y the long side
-    - 2900.0
+    - 4000.0 # X is the short side
+    - 5500.0 # Y the long side
+    - 3000.0
   SPACE_CENTER:
     - 0.0
     - 0.0
-    - 725.0 # Ground at around -800cm, middle at around 750cm
+    - 700.0 # Ground at around -800cm, middle at around 750cm
   INITIAL_CUBE_SIZE:
     - 80
     - 80
@@ -81,3 +81,4 @@ PICT_STRUCT:
     - 64
     - 64
     - 64
+
