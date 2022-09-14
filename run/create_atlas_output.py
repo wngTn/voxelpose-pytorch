@@ -44,6 +44,9 @@ def parse_args():
     parser.add_argument(
         '--cfg', help='experiment configure file name', type=str, required=True)
     parser.add_argument(
+        '--dataDir', type=str, required=True
+    )
+    parser.add_argument(
         '--vis', type=str, nargs='+', default=[], choices=['img2d', 'img3d'])
     parser.add_argument(
         '--vis_output', type=str, default="visualized_output"
@@ -190,8 +193,8 @@ def coco17tobody25(points2d):
     return kpts
 
 
-def save_easymocap_output(preds, experiment_name):
-    output_dir = os.path.join("output_easymocap", experiment_name, "keypoints3d")
+def save_easymocap_output(preds, trial_name, phase):
+    output_dir = os.path.join("output_easymocap", trial_name, phase, "keypoints3d")
     if os.path.exists(output_dir) and os.path.isdir(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
@@ -214,89 +217,117 @@ def save_easymocap_output(preds, experiment_name):
             outfile.write(json_string)
             print('Saved:', file_path)
 
+
+def get_calibration_num(trial_name, phase):
+    
+    calibration_dir = './data/trial_calibrations'
+
+    for i, calibration in enumerate(os.listdir(calibration_dir)):
+        trials_file = os.path.join(calibration_dir, calibration, 'trials.txt')
+        with open(trials_file) as file:
+            lines = file.readlines()
+            lines = [line.rstrip() for line in lines]
+
+            if f"{trial_name}_{phase}" in lines:
+                return i
+    return None
+
+
 def main():
     args = parse_args()
 
-    experiment_name = 'trial_17_recording_03_new'
-    out_prefix = args.vis_output + '/' + experiment_name
+    trials = os.listdir(args.dataDir)
+    for trial_name in trials:
+        trial_path = os.path.join(args.dataDir, trial_name)
+        phases = os.listdir(trial_path)
 
-    MODEL_PATH = os.path.join("output", "holistic_or_synthetic", "multi_person_posenet_50", experiment_name, "final_state.pth.tar")
-    assert(os.path.exists(MODEL_PATH))
+        for phase in phases:
+            phase_path = os.path.join(trial_path, phase)
 
-    dirs = []
-    for e in args.vis:
-        dirs.append(e)
-    prepare_out_dirs(prefix=out_prefix, dataDirs=dirs)
+            out_prefix = args.vis_output + '/' + trial_name + '/' + phase
 
-    gpus = [int(i) for i in config.GPUS.split(',')]
-    print('=> Loading data ..')
-    normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            keypoints2d_file = os.path.join("keypoints2d", trial_name, phase, f'pred_{trial_name}_{phase}.pkl')
+            calibration_num = get_calibration_num(trial_name, phase)
+            MODEL_PATH = os.path.join("output", "holistic_or_synthetic", "multi_person_posenet_50", f"calibration_{calibration_num}", "final_state.pth.tar")
 
-    test_dataset = eval('dataset.' + config.DATASET.TEST_DATASET)(
-        config, config.DATASET.TEST_SUBSET, False, 'data/trial_17_recording_03/pred_trial_17_recording_03_new_dekr_coco.pkl',
-        transforms.Compose([
-            transforms.ToTensor(),
-            normalize,
-        ]))
+            assert(os.path.exists(MODEL_PATH))
 
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset,
-        batch_size=1,
-        shuffle=False,
-        num_workers=0,
-        pin_memory=True)
+            dirs = []
+            for e in args.vis:
+                dirs.append(e)
+            prepare_out_dirs(prefix=out_prefix, dataDirs=dirs)
 
-    cudnn.benchmark = config.CUDNN.BENCHMARK
-    torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
-    torch.backends.cudnn.enabled = config.CUDNN.ENABLED
+            gpus = [int(i) for i in config.GPUS.split(',')]
+            print('=> Loading data ..')
+            normalize = transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    print('=> Constructing models ..')
-    model = eval('models.' + config.MODEL + '.get_multi_person_pose_net')(
-        config,is_train=False)
-    with torch.no_grad():
-        model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
+            config.DATASET.ROOT = phase_path
 
-    test_model_file = MODEL_PATH
-    if config.TEST.MODEL_FILE and os.path.isfile(test_model_file):
-        print('=> load models state {}'.format(test_model_file))
-        model.module.load_state_dict(torch.load(test_model_file))
-    else:
-        raise ValueError('Check the model file for testing!')
+            test_dataset = eval('dataset.' + config.DATASET.TEST_DATASET)(
+                config, config.DATASET.TEST_SUBSET, False, keypoints2d_file,
+                transforms.Compose([
+                    transforms.ToTensor(),
+                    normalize,
+                ]))
 
-    model.eval()
-    preds = {}
-    with torch.no_grad():
-        for l, (inputs, targets_2d, weights_2d, targets_3d, meta, input_heatmap) in enumerate(test_loader):
-            pred, _, _, _, _, _ = model(meta=meta, targets_3d=targets_3d[0], input_heatmaps=input_heatmap)
-            pred = pred.detach().cpu().numpy()
+            test_loader = torch.utils.data.DataLoader(
+                test_dataset,
+                batch_size=1,
+                shuffle=False,
+                num_workers=0,
+                pin_memory=True)
 
-            # WARNING
-            frame_num = l 
-            preds[frame_num] = []
-            if pred is not None:
-                pre = pred[0]
-                for n in range(len(pre)):
-                    joint = pre[n] # joint of one person
-                    if joint[0, 3] >= 0:
-                        # converts back to meters
-                        pruned_joint = np.concatenate((joint[:, :3] / 1000, joint[:, -1].reshape(17, 1)), axis=1)
-                        # joints without the third column
-                        preds[frame_num].append(pruned_joint)
+            cudnn.benchmark = config.CUDNN.BENCHMARK
+            torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
+            torch.backends.cudnn.enabled = config.CUDNN.ENABLED
 
-            
-            if 'img3d' in args.vis:
-                prefix = '{}'.format(f'{out_prefix}/img3d/')
-                save_debug_3d_images(meta[0], pred, f'{prefix}{str(l).zfill(4)}')
-            if 'img2d' in args.vis:
-                prefix = '{}'.format(f'{out_prefix}/img2d/')
-                image_2d_with_anno(meta, pred, f'{prefix}{str(l).zfill(4)}', 1)
+            print('=> Constructing models ..')
+            model = eval('models.' + config.MODEL + '.get_multi_person_pose_net')(
+                config, is_train=False)
+            with torch.no_grad():
+                model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
 
-        # saves the predictions
-        with open(os.path.join(f'{out_prefix}', f'pred_{experiment_name}.pkl'), 'wb') as handle:
-             pickle.dump(preds, handle)
+            test_model_file = MODEL_PATH
+            if config.TEST.MODEL_FILE and os.path.isfile(test_model_file):
+                print('=> load models state {}'.format(test_model_file))
+                model.module.load_state_dict(torch.load(test_model_file))
+            else:
+                raise ValueError('Check the model file for testing!')
 
-        # save_easymocap_output(preds, experiment_name)
+            model.eval()
+            preds = {}
+            with torch.no_grad():
+                for l, (inputs, targets_2d, weights_2d, targets_3d, meta, input_heatmap) in enumerate(test_loader):
+                    pred, _, _, _, _, _ = model(meta=meta, targets_3d=targets_3d[0], input_heatmaps=input_heatmap)
+                    pred = pred.detach().cpu().numpy()
+
+                    # WARNING
+                    frame_num = l 
+                    preds[frame_num] = []
+                    if pred is not None:
+                        pre = pred[0]
+                        for n in range(len(pre)):
+                            joint = pre[n] # joint of one person
+                            if joint[0, 3] >= 0:
+                                # converts back to meters
+                                pruned_joint = np.concatenate((joint[:, :3] / 1000, joint[:, -1].reshape(17, 1)), axis=1)
+                                # joints without the third column
+                                preds[frame_num].append(pruned_joint)
+
+                    
+                    if 'img3d' in args.vis:
+                        prefix = '{}'.format(f'{out_prefix}/img3d/')
+                        save_debug_3d_images(meta[0], pred, f'{prefix}{str(l).zfill(4)}')
+                    if 'img2d' in args.vis:
+                        prefix = '{}'.format(f'{out_prefix}/img2d/')
+                        image_2d_with_anno(meta, pred, f'{prefix}{str(l).zfill(4)}', 1)
+
+                # saves the predictions
+                with open(os.path.join(f'{out_prefix}', f'pred_{trial_name}_{phase}.pkl'), 'wb') as handle:
+                    pickle.dump(preds, handle)
+
+                save_easymocap_output(preds, trial_name, phase)
 
 
 if __name__ == '__main__':
