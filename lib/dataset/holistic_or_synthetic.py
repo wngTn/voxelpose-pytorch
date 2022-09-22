@@ -33,21 +33,40 @@ from utils.cameras_cpu import rotation_to_homogenous
 
 logger = logging.getLogger(__name__)
 
-coco_joints_def = {0: 'nose',
-                   1: 'Leye', 2: 'Reye', 3: 'Lear', 4: 'Rear',
-                   5: 'Lsho', 6: 'Rsho',
-                   7: 'Lelb', 8: 'Relb',
-                   9: 'Lwri', 10: 'Rwri',
-                   11: 'Lhip', 12: 'Rhip',
-                   13: 'Lkne', 14: 'Rkne',
-                   15: 'Lank', 16: 'Rank'}
+coco_joints_def = {
+    0: 'nose',
+    1: 'Leye',
+    2: 'Reye',
+    3: 'Lear',
+    4: 'Rear',
+    5: 'Lsho',
+    6: 'Rsho',
+    7: 'Lelb',
+    8: 'Relb',
+    9: 'Lwri',
+    10: 'Rwri',
+    11: 'Lhip',
+    12: 'Rhip',
+    13: 'Lkne',
+    14: 'Rkne',
+    15: 'Lank',
+    16: 'Rank'
+}
 
-LIMBS = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [11, 13],
-         [13, 15],
-         [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
+LIMBS = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9], [6, 8], [8, 10],
+         [5, 11], [11, 13], [13, 15], [6, 12], [12, 14], [14, 16], [5, 6], [11, 12]]
+
+# Generate values between an intervall with normal distribution
+# from scipy.stats import truncnorm
+# def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
+#     return truncnorm((low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
+
+# X_axis = get_truncated_normal(mean=0, sd=1000, low=-1500, upp=1500)
+# Y_axis = get_truncated_normal(mean=0, sd=1650, low=-2500, upp=2500)
 
 
 class HolisticORSynthetic(Dataset):
+
     def __init__(self, cfg, image_set, is_train, transform=None):
         super().__init__()
         self.pixel_std = 200.0
@@ -84,7 +103,7 @@ class HolisticORSynthetic(Dataset):
         self.space_center = np.array(cfg.MULTI_PERSON.SPACE_CENTER)
         self.initial_cube_size = np.array(cfg.MULTI_PERSON.INITIAL_CUBE_SIZE)
 
-        pose_db_file = os.path.join(self.dataset_root, "..", "panoptic_training_pose.pkl")
+        pose_db_file = os.path.join("data/panoptic_training_pose.pkl")
         self.pose_db = pickle.load(open(pose_db_file, "rb"))
         self.cameras = self._get_cams()
 
@@ -166,7 +185,7 @@ class HolisticORSynthetic(Dataset):
         return ds
 
     def __getitem__(self, idx):
-        nposes = np.random.choice([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], p=[0.025, 0.025, 0.05, 0.05, 0.15, 0.15, 0.25, 0.15, 0.1, 0.05])
+        nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.2, 0.2, 0.25, 0.25])
         # nposes = np.random.choice(range(1, 6))
         bbox_list = []
         center_list = []
@@ -175,8 +194,7 @@ class HolisticORSynthetic(Dataset):
         joints_3d = np.array([p['pose'] for p in select_poses])
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
-        # WARNING this is offsetting the poses, since our coordinate system starts at -800
-
+        # WARNING this is offsetting the poses, since our floor starts at -800
         joints_3d[:, :, 2] = joints_3d[:, :, 2] - 800
 
         for n in range(0, nposes):
@@ -229,8 +247,8 @@ class HolisticORSynthetic(Dataset):
         nposes = len(joints_3d)
 
         # TODO: need to move these to configs as well
-        width = self.image_size[0]
-        height = self.image_size[1]
+        width = 2048
+        height = 1536
         c = np.array([width / 2.0, height / 2.0], dtype=np.float32)
         # s = np.array(
         #     [width / self.pixel_std, height / self.pixel_std], dtype=np.float32)
@@ -244,10 +262,8 @@ class HolisticORSynthetic(Dataset):
         for n in range(nposes):
             pose2d = project_pose(joints_3d[n], cam, True)
 
-            x_check = np.bitwise_and(pose2d[:, 0] >= 0,
-                                     pose2d[:, 0] <= width - 1)
-            y_check = np.bitwise_and(pose2d[:, 1] >= 0,
-                                     pose2d[:, 1] <= height - 1)
+            x_check = np.bitwise_and(pose2d[:, 0] >= 0, pose2d[:, 0] <= width - 1)
+            y_check = np.bitwise_and(pose2d[:, 1] >= 0, pose2d[:, 1] <= height - 1)
             check = np.bitwise_and(x_check, y_check)
             vis = joints_3d_vis[n][:, 0] > 0
             vis[np.logical_not(check)] = 0
@@ -257,10 +273,9 @@ class HolisticORSynthetic(Dataset):
 
         trans = get_affine_transform(c, s, r, self.image_size)
         input = np.ones((height, width, 3), dtype=np.float32)
-        input = cv2.warpAffine(
-            input,
-            trans, (int(self.image_size[0]), int(self.image_size[1])),
-            flags=cv2.INTER_LINEAR)
+        input = cv2.warpAffine(input,
+                               trans, (int(self.image_size[0]), int(self.image_size[1])),
+                               flags=cv2.INTER_LINEAR)
 
         if self.transform:
             input = self.transform(input)
@@ -270,15 +285,12 @@ class HolisticORSynthetic(Dataset):
         for n in range(nposes):
             for i in range(len(joints[0])):
                 if joints_vis[n][i, 0] > 0.0:
-                    joints[n][i, 0:2] = affine_transform(
-                        joints[n][i, 0:2], trans)
-                    if (np.min(joints[n][i, :2]) < 0 or
-                            joints[n][i, 0] >= self.image_size[0] or
+                    joints[n][i, 0:2] = affine_transform(joints[n][i, 0:2], trans)
+                    if (np.min(joints[n][i, :2]) < 0 or joints[n][i, 0] >= self.image_size[0] or
                             joints[n][i, 1] >= self.image_size[1]):
                         joints_vis[n][i, :] = 0
 
-        input_heatmap, _ = self.generate_input_heatmap(
-            joints, joints_vis)
+        input_heatmap, _ = self.generate_input_heatmap(joints, joints_vis)
         input_heatmap = torch.from_numpy(input_heatmap)
         target_heatmap = torch.zeros_like(input_heatmap)
         target_weight = torch.zeros(len(target_heatmap), 1)
@@ -323,7 +335,7 @@ class HolisticORSynthetic(Dataset):
             return 0
         minx, maxx = np.min(pose[idx, 0]), np.max(pose[idx, 0])
         miny, maxy = np.min(pose[idx, 1]), np.max(pose[idx, 1])
-        return np.clip(np.maximum(maxy - miny, maxx - minx) ** 2, 1.0 / 4 * 96 ** 2, 4 * 96 ** 2)
+        return np.clip(np.maximum(maxy - miny, maxx - minx)**2, 1.0 / 4 * 96**2, 4 * 96**2)
 
     def generate_input_heatmap(self, joints, joints_vis):
         '''
@@ -343,9 +355,8 @@ class HolisticORSynthetic(Dataset):
             'Only support gaussian map now!'
 
         if self.target_type == 'gaussian':
-            target = np.zeros(
-                (num_joints, self.heatmap_size[1], self.heatmap_size[0]),
-                dtype=np.float32)
+            target = np.zeros((num_joints, self.heatmap_size[1], self.heatmap_size[0]),
+                              dtype=np.float32)
             feat_stride = self.image_size / self.heatmap_size
 
             for n in range(nposes):
@@ -381,21 +392,18 @@ class HolisticORSynthetic(Dataset):
                         scale = scale * 0.2 if random.random() < 0.1 else scale
                     else:
                         scale = scale * 0.5 if random.random() < 0.05 else scale
-                    g = np.exp(
-                        -((x - x0) ** 2 + (y - y0) ** 2) / (2 * cur_sigma ** 2)) * scale
+                    g = np.exp(-((x - x0)**2 + (y - y0)**2) / (2 * cur_sigma**2)) * scale
 
                     # Usable gaussian range
-                    g_x = max(0,
-                              -ul[0]), min(br[0], self.heatmap_size[0]) - ul[0]
-                    g_y = max(0,
-                              -ul[1]), min(br[1], self.heatmap_size[1]) - ul[1]
+                    g_x = max(0, -ul[0]), min(br[0], self.heatmap_size[0]) - ul[0]
+                    g_y = max(0, -ul[1]), min(br[1], self.heatmap_size[1]) - ul[1]
                     # Image range
                     img_x = max(0, ul[0]), min(br[0], self.heatmap_size[0])
                     img_y = max(0, ul[1]), min(br[1], self.heatmap_size[1])
 
                     target[joint_id][img_y[0]:img_y[1], img_x[0]:img_x[1]] = np.maximum(
-                        target[joint_id][img_y[0]:img_y[1], img_x[0]:img_x[1]],
-                        g[g_y[0]:g_y[1], g_x[0]:g_x[1]])
+                        target[joint_id][img_y[0]:img_y[1], img_x[0]:img_x[1]], g[g_y[0]:g_y[1],
+                                                                                  g_x[0]:g_x[1]])
                 target = np.clip(target, 0, 1)
 
         if self.use_different_joints_weight:
@@ -422,20 +430,30 @@ class HolisticORSynthetic(Dataset):
             mu_y = (joints_3d[n][joint_id[0]][1] + joints_3d[n][joint_id[1]][1]) / 2.0
             mu_z = (joints_3d[n][joint_id[0]][2] + joints_3d[n][joint_id[1]][2]) / 2.0
 
-            i_x = [np.searchsorted(grid1Dx, mu_x - 3 * cur_sigma),
-                   np.searchsorted(grid1Dx, mu_x + 3 * cur_sigma, 'right')]
-            i_y = [np.searchsorted(grid1Dy, mu_y - 3 * cur_sigma),
-                   np.searchsorted(grid1Dy, mu_y + 3 * cur_sigma, 'right')]
-            i_z = [np.searchsorted(grid1Dz, mu_z - 3 * cur_sigma),
-                   np.searchsorted(grid1Dz, mu_z + 3 * cur_sigma, 'right')]
+            i_x = [
+                np.searchsorted(grid1Dx, mu_x - 3 * cur_sigma),
+                np.searchsorted(grid1Dx, mu_x + 3 * cur_sigma, 'right')
+            ]
+            i_y = [
+                np.searchsorted(grid1Dy, mu_y - 3 * cur_sigma),
+                np.searchsorted(grid1Dy, mu_y + 3 * cur_sigma, 'right')
+            ]
+            i_z = [
+                np.searchsorted(grid1Dz, mu_z - 3 * cur_sigma),
+                np.searchsorted(grid1Dz, mu_z + 3 * cur_sigma, 'right')
+            ]
             if i_x[0] >= i_x[1] or i_y[0] >= i_y[1] or i_z[0] >= i_z[1]:
                 continue
 
-            gridx, gridy, gridz = np.meshgrid(grid1Dx[i_x[0]:i_x[1]], grid1Dy[i_y[0]:i_y[1]], grid1Dz[i_z[0]:i_z[1]],
+            gridx, gridy, gridz = np.meshgrid(grid1Dx[i_x[0]:i_x[1]],
+                                              grid1Dy[i_y[0]:i_y[1]],
+                                              grid1Dz[i_z[0]:i_z[1]],
                                               indexing='ij')
-            g = np.exp(-((gridx - mu_x) ** 2 + (gridy - mu_y) ** 2 + (gridz - mu_z) ** 2) / (2 * cur_sigma ** 2))
-            target[i_x[0]:i_x[1], i_y[0]:i_y[1], i_z[0]:i_z[1]] = np.maximum(
-                target[i_x[0]:i_x[1], i_y[0]:i_y[1], i_z[0]:i_z[1]], g)
+            g = np.exp(-((gridx - mu_x)**2 + (gridy - mu_y)**2 + (gridz - mu_z)**2) /
+                       (2 * cur_sigma**2))
+            target[i_x[0]:i_x[1], i_y[0]:i_y[1],
+                   i_z[0]:i_z[1]] = np.maximum(target[i_x[0]:i_x[1], i_y[0]:i_y[1], i_z[0]:i_z[1]],
+                                               g)
 
         target = np.clip(target, 0, 1)
         return target
@@ -445,14 +463,10 @@ class HolisticORSynthetic(Dataset):
 
     @staticmethod
     def get_new_center(center_list):
-        # TODO: these should also be in config
-        # width of room approximately 4.5m in both x and z direction
-        xmin = -1000
-        xmax = 1000
-        ymin = -1200
-        ymax = 1200
         if len(center_list) == 0 or random.random() < 0.7:
-            new_center = np.array([np.random.uniform(xmin, xmax), np.random.uniform(ymin, ymax)])
+            new_center = np.array(
+                [np.random.uniform(-1050.0, 1050.0),
+                 np.random.uniform(-1450.0, 1450.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?
@@ -461,25 +475,18 @@ class HolisticORSynthetic(Dataset):
         return new_center
 
     def isvalid(self, new_center, bbox, bbox_list):
-        # TODO: Put this in config?
-        # in our coordinate system Y+ is down, so our offset is in the negative Y direction
-        origin_z_offset = np.random.uniform(-100, 200)
         new_center_us = new_center.reshape(1, -1)
         vis = 0
+        width = 2048
+        height = 1536
+
         for k, cam in self.cameras.items():
-            # TODO: why so conservative with pixel coordinates?
-            width = self.image_size[0]
-            height = self.image_size[1]
-            center_3d = np.hstack((new_center_us, [[origin_z_offset]]))
-            loc_2d = project_pose(center_3d, cam, True) 
-            # print(center_3d, "->", loc_2d)
-            # TODO: make this offset configurable. Why does Voxelpose use width x height here?
+            loc_2d = project_pose(np.hstack((new_center_us, [[200.0]])), cam, True)
             if 10 < loc_2d[0, 0] < width - 10 and 10 < loc_2d[0, 1] < height - 10:
-                # print(f"Cam {cam['id']} visible")
                 vis += 1
 
-        # print("Views visible: ", vis)
         if len(bbox_list) == 0:
+            # === at least visible from two cameras
             return vis >= 2
 
         bbox_list = np.array(bbox_list)
@@ -493,42 +500,26 @@ class HolisticORSynthetic(Dataset):
         area_list = (bbox_list[:, 2] - bbox_list[:, 0]) * (bbox_list[:, 3] - bbox_list[:, 1])
         iou_list = intersection / (area + area_list - intersection)
 
-        return vis >= 2 and np.max(iou_list) < 0.05
+        return vis >= 2 and np.max(iou_list) < 0.075
 
     @staticmethod
     def calc_bbox(pose, pose_vis):
         index = pose_vis[:, 0] > 0
-        bbox = [np.min(pose[index, 0]), np.min(pose[index, 1]),
-                np.max(pose[index, 0]), np.max(pose[index, 1])]
+        bbox = [
+            np.min(pose[index, 0]),
+            np.min(pose[index, 1]),
+            np.max(pose[index, 0]),
+            np.max(pose[index, 1])
+        ]
 
         return np.array(bbox)
 
-CALIBRATION_TRIAL_08_RECORDING_04 = np.array(
-    [
-        np.eye(4),
-        np.array(
-            [
-                [1, 0, 0, -0.0125 * 1000],
-                [0, 1, 0, -0.0125 * 1000],
-                [0, 0, 1, 0], 
-                [0, 0, 0, 1]
-            ]
-        ),
-        np.array(
-            [
-                [1, 0, 0, 0.025 * 1000],
-                [0, 1, 0, 0.01 * 1000],
-                [0, 0, 1, -0.01 * 1000], 
-                [0, 0, 0, 1]
-            ]
-        ),
-        np.array(
-            [
-                [1, 0, 0, 0.003 * 1000],
-                [0, 1, 0, -0.018 * 1000],
-                [0, 0, 1, 0.0125 * 1000], 
-                [0, 0, 0, 1]
-            ]
-        )
-    ]
-)
+
+CALIBRATION_TRIAL_08_RECORDING_04 = np.array([
+    np.eye(4),
+    np.array([[1, 0, 0, -0.0125 * 1000], [0, 1, 0, -0.0125 * 1000], [0, 0, 1, 0], [0, 0, 0, 1]]),
+    np.array([[1, 0, 0, 0.025 * 1000], [0, 1, 0, 0.01 * 1000], [0, 0, 1, -0.01 * 1000],
+              [0, 0, 0, 1]]),
+    np.array([[1, 0, 0, 0.003 * 1000], [0, 1, 0, -0.018 * 1000], [0, 0, 1, 0.0125 * 1000],
+              [0, 0, 0, 1]])
+])
