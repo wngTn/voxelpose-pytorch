@@ -17,7 +17,7 @@ It tracks the people through easy euclidian distance between each frame
 '''
 
 
-NAME = 'trial_17_recording_03_04'
+NAME = 'trial_17_recording_03_new'
 
 def prepare_out_dirs(prefix, dataDir='keypoints3d'):
     output_dir = os.path.join(prefix, dataDir)
@@ -38,7 +38,7 @@ def convToEasyMocap(preds):
                 # pred['keypoints3d'][:, :3] = pred['keypoints3d'][:, :3] / 1000
                 pred['keypoints3d'] = [[round(c, 3) for c in row] for row in pred['keypoints3d'].tolist()]
 
-        json_string = json.dumps(frame)
+        json_string = json.dumps(frame, indent=4)
         with open(file_path, 'w') as outfile:
             outfile.write(json_string)
             print('Saved:', file_path)
@@ -72,7 +72,7 @@ def distance_two_people(p1, p2):
 
 def main():
     res = []
-    with open(os.path.join('output_vis', NAME, 'pred_voxelpose.pkl'), 'rb') as f:
+    with open(os.path.join('visualized_output', NAME, 'pred_voxelpose.pkl'), 'rb') as f:
         preds = pickle.load(f)
         first_frame = preds[5]
 
@@ -188,7 +188,7 @@ def main():
 
 def no_tracking():
     res = []
-    with open(os.path.join('output_vis', f"{NAME}", 'pred_voxelpose.pkl'), 'rb') as f:
+    with open(os.path.join('visualized_output', f"{NAME}", f'pred_{NAME}.pkl'), 'rb') as f:
         preds = pickle.load(f)
         
         for i, (k, v) in enumerate(preds.items()):

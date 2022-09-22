@@ -133,6 +133,7 @@ dmypy.json
 **/data/CampusSeq1/Calibration
 **/data/Shelf/Camera*
 **/data/trial_*
+**/visualized_output/**
 */data/panoptic-toolbox/data/*
 **/output/*
 **/output_vis/*

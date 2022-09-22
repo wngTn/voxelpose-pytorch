@@ -53,7 +53,7 @@ LIMBS = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9],
 
 
 class HolisticOR(JointsDataset):
-    def __init__(self, cfg, image_set, is_train, transform=None):
+    def __init__(self, cfg, image_set, is_train, poses_2d_file, transform=None):
         self.pixel_std = 200.0
         self.joints_def = coco_joints_def
         super().__init__(cfg, image_set, is_train, transform)
@@ -63,13 +63,13 @@ class HolisticOR(JointsDataset):
         self.num_views = len(self.cam_list)
         self.frame_range = list(range(0, 9000, 5))
 
-        self.pred_pose2d = self._get_pred_pose2d()
+        self.pred_pose2d = self._get_pred_pose2d(poses_2d_file)
         self.db = self._get_db()
 
         self.db_size = len(self.db)
 
-    def _get_pred_pose2d(self):
-        file = os.path.join(self.dataset_root, f"pred_{os.path.basename(self.dataset_root)}_dekr_coco.pkl")
+    def _get_pred_pose2d(self, poses_2d_file):
+        file = os.path.join(poses_2d_file)
         with open(file, "rb") as pfile:
             logging.info("=> load {}".format(file))
             pred_2d = pickle.load(pfile)

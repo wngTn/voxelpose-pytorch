@@ -62,7 +62,7 @@ def save_batch_image_with_joints_multi(batch_images,
         ndarr = grid.mul(255).clamp(0, 255).byte().permute(1, 2, 0).cpu().numpy()
         ndarr = ndarr.copy()
 
-        ndarr = eval(f"cv2.imread('data/trial_17_recording_04/cn0{cam_num + 1}/0000000005_color.jpg')")
+        ndarr = eval(f"cv2.imread('data/trial_17_recording_03/cn0{cam_num + 1}/0000000005_color.jpg')")
 
         nmaps = batch_image.size(0)
         xmaps = min(nrow, nmaps)
