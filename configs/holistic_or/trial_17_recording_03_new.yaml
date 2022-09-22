@@ -33,10 +33,10 @@ NETWORK:
   TARGET_TYPE: gaussian
   IMAGE_SIZE:
   - 800
-  - 640
+  - 608
   HEATMAP_SIZE:
   - 200
-  - 160
+  - 152
   SIGMA: 3
   NUM_JOINTS: 17
   USE_GT: False
