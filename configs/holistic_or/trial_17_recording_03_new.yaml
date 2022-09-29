@@ -18,7 +18,7 @@ DATASET:
   DATA_FORMAT: jpeg
   DATA_AUGMENTATION: False
   FLIP: False
-  ROOT: './data/trial_17_recording_03' # where to get the cameras
+  ROOT: './data/trial_17_recording_04' # where to get the cameras
   ROT_FACTOR: 45
   SCALE_FACTOR: 0.35
   TEST_SUBSET: 'validation'

@@ -185,8 +185,8 @@ class HolisticORSynthetic(Dataset):
         return ds
 
     def __getitem__(self, idx):
-        nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.2, 0.2, 0.25, 0.25])
-        # nposes = np.random.choice(range(1, 6))
+        # nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.2, 0.2, 0.25, 0.25])
+        nposes = np.random.choice(range(1, 10))
         bbox_list = []
         center_list = []
 
@@ -465,8 +465,8 @@ class HolisticORSynthetic(Dataset):
     def get_new_center(center_list):
         if len(center_list) == 0 or random.random() < 0.7:
             new_center = np.array(
-                [np.random.uniform(-1050.0, 1050.0),
-                 np.random.uniform(-1450.0, 1450.0)])
+                [np.random.uniform(-1650.0, 1650.0),
+                 np.random.uniform(-2450.0, 2450.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?

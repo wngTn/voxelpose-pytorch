@@ -17,7 +17,7 @@ It tracks the people through easy euclidian distance between each frame
 '''
 
 
-NAME = 'trial_17_recording_03_new'
+NAME = 'trial_08_recording_04_new'
 
 def prepare_out_dirs(prefix, dataDir='keypoints3d'):
     output_dir = os.path.join(prefix, dataDir)

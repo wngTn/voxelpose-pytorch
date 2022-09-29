@@ -41,8 +41,8 @@ LIMBS17 = [[0, 1], [0, 2], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [7, 9
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Visualize your network')
-    parser.add_argument(
-        '--cfg', help='experiment configure file name', type=str, required=True)
+    # parser.add_argument(
+    #     '--cfg', help='experiment configure file name', type=str, required=True)
     parser.add_argument(
         '--vis', type=str, nargs='+', default=[], choices=['img2d', 'img3d'])
     parser.add_argument(
@@ -51,7 +51,6 @@ def parse_args():
     
 
     args, rest = parser.parse_known_args()
-    update_config(args.cfg)
 
     return args
 
@@ -190,13 +189,13 @@ def coco17tobody25(points2d):
     return kpts
 
 
-def save_easymocap_output(preds, experiment_name):
-    output_dir = os.path.join("output_easymocap", experiment_name, "keypoints3d")
+def save_easymocap_output(preds, data_dir):
+    output_dir = os.path.join("/data/atlas_3d_keypoints", data_dir, "keypoints3d")
     if os.path.exists(output_dir) and os.path.isdir(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    for k, v in enumerate(preds.items()):
+    for k, v in preds.items():
         frame_num = '{:06d}'.format(k)
         file_name = frame_num + '.json'
         file_path = os.path.join(output_dir, file_name)
@@ -205,36 +204,49 @@ def save_easymocap_output(preds, experiment_name):
             res_temp = {
                 'id' : j,
                 'keypoints3d' : [
-                    [round(c, 3) for c in row] for row in vv
+                    [round(c, 3) for c in row] for row in vv.tolist()
                 ]
             }
             frame.append(res_temp)
-        json_string = json.dump(frame)
+        json_string = json.dumps(frame, indent=4)
         with open(file_path, 'w') as outfile:
             outfile.write(json_string)
             print('Saved:', file_path)
 
-def main():
+def main(calibration, data_dir):
     args = parse_args()
 
-    experiment_name = 'trial_17_recording_03_new'
-    out_prefix = args.vis_output + '/' + experiment_name
+    update_config(f"configs/holistic_or/calibration_{calibration}.yaml")
 
-    MODEL_PATH = os.path.join("output", "holistic_or_synthetic", "multi_person_posenet_50", experiment_name, "final_state.pth.tar")
+    data_dir_prefix = '/data/pointcloud_export'
+
+    config.DATASET.ROOT = os.path.join(data_dir_prefix, data_dir)
+
+    out_prefix = os.path.join('.', data_dir) 
+
+    MODEL_PATH = os.path.join("calibration_models", f"calibration_{str(calibration).zfill(2)}.pth.tar")
     assert(os.path.exists(MODEL_PATH))
 
-    dirs = []
-    for e in args.vis:
-        dirs.append(e)
-    prepare_out_dirs(prefix=out_prefix, dataDirs=dirs)
+    # dirs = ['.']
+    # for e in args.vis:
+    #     dirs.append(e)
+    # prepare_out_dirs(prefix=out_prefix, dataDirs=dirs)
 
-    gpus = [int(i) for i in config.GPUS.split(',')]
+    gpus = [0]
     print('=> Loading data ..')
     normalize = transforms.Normalize(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    test_dataset = eval('dataset.' + config.DATASET.TEST_DATASET)(
-        config, config.DATASET.TEST_SUBSET, False, 'data/trial_17_recording_03/pred_trial_17_recording_03_new_dekr_coco.pkl',
+    
+    keypoints_2d_file = os.listdir(os.path.join("keypoints2d", data_dir))
+
+    assert len(keypoints_2d_file) != 0
+
+    keypoints_2d_file = os.path.join("keypoints2d", data_dir, keypoints_2d_file[0])
+
+
+    test_dataset = eval('dataset.' + "atlas_or")(
+        config, config.DATASET.TEST_SUBSET, False, keypoints_2d_file,
         transforms.Compose([
             transforms.ToTensor(),
             normalize,
@@ -293,12 +305,28 @@ def main():
                 image_2d_with_anno(meta, pred, f'{prefix}{str(l).zfill(4)}', 1)
 
         # saves the predictions
-        with open(os.path.join(f'{out_prefix}', f'pred_{experiment_name}.pkl'), 'wb') as handle:
-             pickle.dump(preds, handle)
+        # with open(os.path.join(f'{out_prefix}', f'3d_keypoints.pkl'), 'wb') as handle:
+        #      pickle.dump(preds, handle)
 
-        # save_easymocap_output(preds, experiment_name)
+        save_easymocap_output(preds, data_dir)
+
+def load_calibrations():
+    with open('calibrations.json', 'r') as f:
+        data = json.load(f)
+    return data
 
 
 if __name__ == '__main__':
-    main()
+    calibrations = load_calibrations()
+
+    for i in range(22, 26):
+        trials = calibrations[i]["trials"]
+
+        for trial_phase in trials:
+            phase = trial_phase.split('_')[-1]
+            trial = trial_phase[:-(len(phase) + 1)]
+
+            main(i, f"{trial}/{phase}")
+
+    # main(22, "211209_animal_trial_15/LAC")
 
