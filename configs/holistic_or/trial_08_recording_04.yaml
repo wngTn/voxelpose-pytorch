@@ -32,26 +32,26 @@ NETWORK:
   PRETRAINED:  'models/pytorch/imagenet/resnet50-19c8e357.pth'
   TARGET_TYPE: gaussian
   IMAGE_SIZE:
-  - 2048
-  - 1536
+  - 800
+  - 608
   HEATMAP_SIZE:
   - 200
-  - 160
+  - 152
   SIGMA: 3
   NUM_JOINTS: 17
   USE_GT: False
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
-  BATCH_SIZE: 2
+  BATCH_SIZE: 5
   SHUFFLE: true
   BEGIN_EPOCH: 0
   END_EPOCH: 30
   RESUME: true
   OPTIMIZER: adam
-  LR: 0.0001 # default 0.0001
+  LR: 0.0001 
 TEST:
-  MODEL_FILE: "model_best.pth.tar"
+  MODEL_FILE: "final_state.pth.tar"
   BATCH_SIZE: 1
 DEBUG:
   DEBUG: true
@@ -59,18 +59,18 @@ DEBUG:
   SAVE_HEATMAPS_PRED: true
 MULTI_PERSON:
   SPACE_SIZE:
-    - 3800.0 # X is the short side
-    - 5400.0 # Y the long side
-    - 2900.0
+    - 4500.0 # X is the short side
+    - 5500.0 # Y the long side
+    - 3000.0
   SPACE_CENTER:
     - 0.0
     - 0.0
-    - 725.0 # Ground at around -800cm, middle at around 750cm
+    - 700.0 # Ground at around -800cm, middle at around 750cm
   INITIAL_CUBE_SIZE:
     - 80
     - 80
     - 20
-  MAX_PEOPLE_NUM: 8
+  MAX_PEOPLE_NUM: 10
   THRESHOLD: 0.1
 PICT_STRUCT:
   GRID_SIZE:

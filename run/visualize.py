@@ -217,10 +217,11 @@ def save_easymocap_output(preds, experiment_name):
 def main():
     args = parse_args()
 
-    experiment_name = 'trial_17_recording_03_new'
+    experiment_name = 'trial_08_recording_04_new'
     out_prefix = args.vis_output + '/' + experiment_name
 
-    MODEL_PATH = os.path.join("output", "holistic_or_synthetic", "multi_person_posenet_50", experiment_name, "final_state.pth.tar")
+    # MODEL_PATH = os.path.join("output", "holistic_or_synthetic", "multi_person_posenet_50", experiment_name, "final_state.pth.tar")
+    MODEL_PATH = "output/holistic_or_synthetic/multi_person_posenet_50/trial_08_recording_04/final_state2.pth.tar"
     assert(os.path.exists(MODEL_PATH))
 
     dirs = []
@@ -234,7 +235,7 @@ def main():
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     test_dataset = eval('dataset.' + config.DATASET.TEST_DATASET)(
-        config, config.DATASET.TEST_SUBSET, False, 'data/trial_17_recording_03/pred_trial_17_recording_03_dekr_coco.pkl',
+        config, config.DATASET.TEST_SUBSET, False, 'data/trial_08_recording_04/pred_trial_08_recording_04_dekr_coco.pkl',
         transforms.Compose([
             transforms.ToTensor(),
             normalize,
