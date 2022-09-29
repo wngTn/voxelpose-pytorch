@@ -465,7 +465,7 @@ class HolisticORSynthetic(Dataset):
     def get_new_center(center_list):
         if len(center_list) == 0 or random.random() < 0.7:
             new_center = np.array(
-                [np.random.uniform(-1650.0, 1650.0),
+                [np.random.uniform(-1850.0, 1850.0),
                  np.random.uniform(-2450.0, 2450.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
