@@ -134,10 +134,7 @@ class HolisticORSynthetic(Dataset):
         ds['cx'] = color_intrinsics[0, 2]
         ds['cy'] = color_intrinsics[1, 2]
         # images are undistorted! Just put 0. Voxelpose assumes just 4 dist coeffs
-        dist = fs.getNode("color_distortion_coefficients").mat()
-        # ds['k'] = np.array(dist[[0, 1, 4, 5, 6, 7]])
-        # ds['p'] = np.array(dist[2:4])
-        # we learn on undistorted images
+
         ds['k'] = np.zeros((3, 1))
         ds['p'] = np.zeros((2, 1))
 
@@ -172,6 +169,7 @@ class HolisticORSynthetic(Dataset):
 
         if os.path.basename(self.dataset_root) == "trial_08_recording_04_calibrated":
             depth2world = depth2world @ CALIBRATION_TRIAL_08_RECORDING_04[int(cam[-1]) - 1]
+
         # depth_R, depth_T = homogenous_to_rot_trans(depth2world)
         # ds["depth2world"] = depth2world
         color2world = depth2world @ np.linalg.inv(depth2color)
@@ -186,11 +184,21 @@ class HolisticORSynthetic(Dataset):
 
     def __getitem__(self, idx):
         # nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.2, 0.2, 0.25, 0.25])
-        nposes = np.random.choice(range(1, 10))
+        nposes = np.random.choice(range(1, 8))
         bbox_list = []
         center_list = []
 
-        select_poses = np.random.choice(self.pose_db, nposes)
+        # we now only take adult poses 
+        internal_counter = 0
+        select_poses = []
+        while internal_counter < nposes:
+            select_pose = np.random.choice(self.pose_db, 1)
+            # distance between eye and ankle should be more than 1300cm
+            if select_pose[0]['pose'][1][2] - select_pose[0]['pose'][-1][2] > 1300:
+                select_poses.append(select_pose[0])
+                internal_counter += 1
+        select_poses = np.array(select_poses, dtype=object)
+        # select_poses = np.random.choice(self.pose_db, nposes)
         joints_3d = np.array([p['pose'] for p in select_poses])
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
@@ -465,8 +473,8 @@ class HolisticORSynthetic(Dataset):
     def get_new_center(center_list):
         if len(center_list) == 0 or random.random() < 0.7:
             new_center = np.array(
-                [np.random.uniform(-1650.0, 1650.0),
-                 np.random.uniform(-2450.0, 2450.0)])
+                [np.random.uniform(-2700.0, 2700.0),
+                 np.random.uniform(-3350.0, 3350.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?
@@ -500,7 +508,7 @@ class HolisticORSynthetic(Dataset):
         area_list = (bbox_list[:, 2] - bbox_list[:, 0]) * (bbox_list[:, 3] - bbox_list[:, 1])
         iou_list = intersection / (area + area_list - intersection)
 
-        return vis >= 2 and np.max(iou_list) < 0.075
+        return vis >= 2 and np.max(iou_list) < 0.05
 
     @staticmethod
     def calc_bbox(pose, pose_vis):
