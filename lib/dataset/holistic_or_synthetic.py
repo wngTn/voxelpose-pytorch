@@ -203,12 +203,12 @@ class HolisticORSynthetic(Dataset):
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
         # Additionally sets lower key-points to in-visible with chance of 5%
-        for pose in joints_3d_vis:
-            # 11 = left_hip, 12 = right_hipe, ..., 16 = right_ankle
-            for pose_id in range(11, 17):
-                invisible = random.random() < 0.05
-                if invisible:
-                    pose[pose_id] = np.full(3, fill_value=False, dtype=bool)
+        # for pose in joints_3d_vis:
+        #     # 11 = left_hip, 12 = right_hipe, ..., 16 = right_ankle
+        #     for pose_id in range(11, 17):
+        #         invisible = random.random() < 0.05
+        #         if invisible:
+        #             pose[pose_id] = np.full(3, fill_value=False, dtype=bool)
 
         # WARNING this is offsetting the poses, since our floor starts at -800
         joints_3d[:, :, 2] = joints_3d[:, :, 2] - 800
@@ -497,7 +497,7 @@ class HolisticORSynthetic(Dataset):
         height = 1536
 
         for k, cam in self.cameras.items():
-            loc_2d = project_pose(np.hstack((new_center_us, [[200.0]])), cam, True)
+            loc_2d = project_pose(np.hstack((new_center_us, [[50.0]])), cam, True)
             if 10 < loc_2d[0, 0] < width - 10 and 10 < loc_2d[0, 1] < height - 10:
                 vis += 1
 
