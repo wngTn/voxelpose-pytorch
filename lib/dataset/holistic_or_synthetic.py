@@ -202,6 +202,14 @@ class HolisticORSynthetic(Dataset):
         joints_3d = np.array([p['pose'] for p in select_poses])
         joints_3d_vis = np.array([p['vis'] for p in select_poses])
 
+        # Additionally sets lower key-points to in-visible with chance of 5%
+        for pose in joints_3d_vis:
+            # 11 = left_hip, 12 = right_hipe, ..., 16 = right_ankle
+            for pose_id in range(11, 17):
+                invisible = random.random() < 0.05
+                if invisible:
+                    pose[pose_id] = np.full(3, fill_value=False, dtype=bool)
+
         # WARNING this is offsetting the poses, since our floor starts at -800
         joints_3d[:, :, 2] = joints_3d[:, :, 2] - 800
 
@@ -474,7 +482,7 @@ class HolisticORSynthetic(Dataset):
         if len(center_list) == 0 or random.random() < 0.7:
             new_center = np.array(
                 [np.random.uniform(-2700.0, 2700.0),
-                 np.random.uniform(-3350.0, 3350.0)])
+                 np.random.uniform(-3450.0, 3450.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?

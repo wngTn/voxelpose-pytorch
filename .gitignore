@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+keypoints2d/*
+calibration_models/*
+
 # C extensions
 *.so
 
