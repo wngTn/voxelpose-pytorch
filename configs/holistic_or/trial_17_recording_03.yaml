@@ -43,7 +43,7 @@ NETWORK:
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
-  BATCH_SIZE: 5
+  BATCH_SIZE: 1
   SHUFFLE: true
   BEGIN_EPOCH: 0
   END_EPOCH: 30
@@ -59,8 +59,8 @@ DEBUG:
   SAVE_HEATMAPS_PRED: true
 MULTI_PERSON:
   SPACE_SIZE:
-    - 5500.0 # X is the short side
-    - 6750.0 # Y the long side
+    - 3000.0 # X is the short side
+    - 4000.0 # Y the long side
     - 3000.0
   SPACE_CENTER:
     - 0.0

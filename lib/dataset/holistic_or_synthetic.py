@@ -125,6 +125,7 @@ class HolisticORSynthetic(Dataset):
         ds = OrderedDict()
         scaling = 1000
         intrinsics = osp.join(self.dataset_root, cam, 'camera_calibration.yml')
+        ds['id'] = int(cam[-1]) 
         print(intrinsics)
         assert osp.exists(intrinsics)
         fs = cv2.FileStorage(intrinsics, cv2.FILE_STORAGE_READ)
@@ -283,6 +284,9 @@ class HolisticORSynthetic(Dataset):
             check = np.bitwise_and(x_check, y_check)
             vis = joints_3d_vis[n][:, 0] > 0
             vis[np.logical_not(check)] = 0
+
+            if cam['id'] == 4 and np.average(pose2d[:, 0]) > 1600 and np.average(pose2d[:, 1]) > 1500:
+                vis = np.full(17, fill_value=False)
 
             joints.append(pose2d)
             joints_vis.append(np.repeat(np.reshape(vis, (-1, 1)), 2, axis=1))
@@ -481,8 +485,8 @@ class HolisticORSynthetic(Dataset):
     def get_new_center(center_list):
         if len(center_list) == 0 or random.random() < 0.7:
             new_center = np.array(
-                [np.random.uniform(-2500.0, 2500.0),
-                 np.random.uniform(-3450.0, 3450.0)])
+                [np.random.uniform(-1200.0, 1500.0),
+                 np.random.uniform(-1500.0, 1500.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?
