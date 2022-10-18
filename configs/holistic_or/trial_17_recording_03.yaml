@@ -35,8 +35,8 @@ NETWORK:
   - 800
   - 608
   HEATMAP_SIZE:
-  - 200
-  - 152
+  - 400 # 200
+  - 204 # 152
   SIGMA: 3
   NUM_JOINTS: 17
   USE_GT: False
