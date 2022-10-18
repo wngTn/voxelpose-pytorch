@@ -481,7 +481,7 @@ class HolisticORSynthetic(Dataset):
     def get_new_center(center_list):
         if len(center_list) == 0 or random.random() < 0.7:
             new_center = np.array(
-                [np.random.uniform(-2700.0, 2700.0),
+                [np.random.uniform(-2500.0, 2500.0),
                  np.random.uniform(-3450.0, 3450.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
@@ -497,7 +497,7 @@ class HolisticORSynthetic(Dataset):
         height = 1536
 
         for k, cam in self.cameras.items():
-            loc_2d = project_pose(np.hstack((new_center_us, [[50.0]])), cam, True)
+            loc_2d = project_pose(np.hstack((new_center_us, [[200.0]])), cam, True)
             if 10 < loc_2d[0, 0] < width - 10 and 10 < loc_2d[0, 1] < height - 10:
                 vis += 1
 
