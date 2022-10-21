@@ -125,7 +125,7 @@ class HolisticORSynthetic(Dataset):
         ds = OrderedDict()
         scaling = 1000
         intrinsics = osp.join(self.dataset_root, cam, 'camera_calibration.yml')
-        ds['id'] = int(cam[-1]) 
+        ds['id'] = int(cam[-1])
         print(intrinsics)
         assert osp.exists(intrinsics)
         fs = cv2.FileStorage(intrinsics, cv2.FILE_STORAGE_READ)
@@ -185,17 +185,17 @@ class HolisticORSynthetic(Dataset):
 
     def __getitem__(self, idx):
         # nposes = np.random.choice([1, 2, 3, 4, 5], p=[0.1, 0.2, 0.2, 0.25, 0.25])
-        nposes = np.random.choice(range(3, 8))
+        nposes = np.random.choice(range(1, 8))
         bbox_list = []
         center_list = []
 
-        # we now only take adult poses 
+        # we now only take adult poses
         internal_counter = 0
         select_poses = []
         while internal_counter < nposes:
             select_pose = np.random.choice(self.pose_db, 1)
             # distance between eye and ankle should be more than 1300cm
-            if select_pose[0]['pose'][1][2] - select_pose[0]['pose'][-1][2] > 1300:
+            if select_pose[0]['pose'][1][2] - select_pose[0]['pose'][-1][2] > 1000:
                 select_poses.append(select_pose[0])
                 internal_counter += 1
         select_poses = np.array(select_poses, dtype=object)
@@ -285,7 +285,8 @@ class HolisticORSynthetic(Dataset):
             vis = joints_3d_vis[n][:, 0] > 0
             vis[np.logical_not(check)] = 0
 
-            if cam['id'] == 4 and np.average(pose2d[:, 0]) > 1620 and np.average(pose2d[:, 1]) > 1500 and random.random() < 0.5:
+            if cam['id'] == 4 and np.average(pose2d[:, 0]) > 1620 and np.average(
+                    pose2d[:, 1]) > 1500 and random.random() < 0.2:
                 vis = np.full(17, fill_value=False)
 
             joints.append(pose2d)
@@ -483,10 +484,10 @@ class HolisticORSynthetic(Dataset):
 
     @staticmethod
     def get_new_center(center_list):
-        if len(center_list) == 0 or random.random() < 0.9:
+        if len(center_list) == 0 or random.random() < 0.8:
             new_center = np.array(
-                [np.random.uniform(-1200.0, 1300.0),
-                 np.random.uniform(-1500.0, 1300.0)])
+                [np.random.uniform(-1300.0, 1300.0),
+                 np.random.uniform(-1600.0, 1300.0)])
         else:
             xy = center_list[np.random.choice(range(len(center_list)))]
             # TODO: do these offsets affect us?
