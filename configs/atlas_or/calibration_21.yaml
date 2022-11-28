@@ -13,8 +13,8 @@ PRINT_FREQ: 100
 
 DATASET:
   COLOR_RGB: True
-  TRAIN_DATASET: 'holistic_or_synthetic'
-  TEST_DATASET: 'holistic_or'
+  TRAIN_DATASET: 'atlas_or_synthetic'
+  TEST_DATASET: 'atlas_or'
   DATA_FORMAT: jpeg
   DATA_AUGMENTATION: False
   FLIP: False
@@ -59,8 +59,8 @@ DEBUG:
   SAVE_HEATMAPS_PRED: true
 MULTI_PERSON:
   SPACE_SIZE:
-    - 4500.0 # X is the short side
-    - 5500.0 # Y the long side
+    - 3000.0 # X is the short side
+    - 4000.0 # Y the long side
     - 3000.0
   SPACE_CENTER:
     - 0.0
