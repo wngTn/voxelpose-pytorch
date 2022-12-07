@@ -103,7 +103,7 @@ class AtlasORSynthetic(Dataset):
         # bring our calibration files into format of voxelpose
         cameras = OrderedDict()
         cams = sorted(next(os.walk(self.dataset_root))[1])
-        cams = [x for x in cams if not x.endswith('.txt')]
+        cams = [x for x in cams if not x.startswith('.')]
         for idx, cam_id in enumerate(cams):
             ds = self._get_single_cam(cam_id)
             cameras[str(int(cam_id[-1]) - 1)] = ds
