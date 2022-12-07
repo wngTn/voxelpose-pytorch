@@ -41,7 +41,7 @@ def train_3d(config, model, optimizer, loader, epoch, output_dir, writer_dict, d
                                                                               targets_2d=targets_2d,
                                                                               weights_2d=weights_2d,
                                                                               targets_3d=targets_3d[0])
-        elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET or 'holistic_or':
+        elif 'campus' in config.DATASET.TEST_DATASET or 'shelf' in config.DATASET.TEST_DATASET or 'holistic_or' in config.DATA.TEST_DATASET or 'atlas_or' in config.DATA.TEST_DATASET:
             pred, heatmaps, grid_centers, loss_2d, loss_3d, loss_cord = model(meta=meta, targets_3d=targets_3d[0],
                                                                               input_heatmaps=input_heatmap)
         loss_2d = loss_2d.mean()
