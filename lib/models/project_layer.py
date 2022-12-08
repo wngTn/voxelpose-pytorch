@@ -21,7 +21,7 @@ class ProjectLayer(nn.Module):
         self.grid_size = cfg.MULTI_PERSON.SPACE_SIZE
         self.cube_size = cfg.MULTI_PERSON.INITIAL_CUBE_SIZE
         self.grid_center = cfg.MULTI_PERSON.SPACE_CENTER
-        self.holistic_or = cfg.DATASET.TRAIN_DATASET == "holistic_or_synthetic"
+        self.holistic_or = cfg.DATASET.TRAIN_DATASET == "holistic_or_synthetic" or cfg.DATASET.TRAIN_DATASET == "atlas_or_synthetic"
 
     def compute_grid(self, boxSize, boxCenter, nBins, device=None):
         if isinstance(boxSize, int) or isinstance(boxSize, float):
